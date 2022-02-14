@@ -6,11 +6,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-		     
+#include <string>
+#include <vector>
+
+
+using namespace std;
 #define MAXLINE   132
 #define MAXWORD    32
 
-#define NF 3		 // number of fields in each message
 
 #define MSG_KINDS 5
 typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
@@ -70,23 +73,25 @@ void WARNING (const char *fmt, ... )
 
 
 // ------------------------------
-MSG composeMSTR (const char *a, const char *b, const char *c)
+MSG composeHELLOmsg (const char *a, const char *b, const char *c)
 {
     MSG  msg;
 
+
     memset( (char *) &msg, 0, sizeof(msg) );
+
 
     return msg;
 }    
 // ------------------------------    
-MSG composeMINT (int a, int b, int c)
+MSG composeACKmsg (int a, int b, int c)
 {
     MSG  msg;
 
     return msg;
 }    
 // ------------------------------
-MSG  composeMFLOAT (float a, float b, float c)
+MSG  composeADDmsg (float a, float b, float c)
 {
     MSG  msg;
 
@@ -143,18 +148,29 @@ void do_client (int fifoCS, int fifoSC)
 }
 
 int main(int argc, char *argv[]) {
-
+    char tokens[10][MAXWORD];
+    // parse the input 
+        
     // open fifo
 
     if (argc == 3 and strcmp(argv[1], "master") == 0) {
         // master switch
+        for (int i = 1; i < 3; i++) {
+            strcpy(tokens[i], argv[i]);
+            // tokens[0] = "master"
+            // tokens[1] = "nSwitch"
+        }
     } else if (argc == 6) {
         // pswi switch, TODO: error check argument
-
+        for (int i = 1; i < 6; i++) {
+            strcpy(tokens[i], argv[i]);
+            // tokens[1] = "pswi"
+            // tokens[2] = "datafile"
+            // tokens[3] = "null//pswj"
+            // tokens[4] = "null/pswk"
+            // tokens[5] = "IPlow-IPhigh"
+        }
     }
-    
-  
-
 
 
     return 0;
