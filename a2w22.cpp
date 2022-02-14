@@ -13,12 +13,22 @@
 using namespace std;
 #define MAXLINE   132
 #define MAXWORD    32
-
-
 #define MSG_KINDS 5
 typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
 char KINDNAME[][MAXWORD]= { "HELLO", "HELLO_ACK", "ASK", "ADD", "RELAY" };
 
+typedef struct {
+    int switchID;
+    int lowIP;
+    int highIP;
+    int pswj;
+    int pswk;
+} SWITCH;
+
+typedef struct {
+    int numSwitch;
+    
+} MASTERSWITCH;
 
 typedef struct {
     int switchNUM;
@@ -152,9 +162,62 @@ void printToken(char tokens[][MAXWORD], int len) {
         printf("argument %d: %s\n", i, tokens[i]);
     }
 }
+
+void printSwitch(SWITCH* pSwitch) {
+    printf("switchID: %d\n", pSwitch -> switchID);
+    printf("lowIP: %d\n", pSwitch -> lowIP);
+    printf("highIP: %d\n", pSwitch -> highIP);
+    printf("pswj: %d\n", pSwitch -> pswj);
+    printf("pswk: %d\n", pSwitch -> pswk);
+}
+
+// EXIT IF INCORRECT ARGUMENT
+int checkArgument() {
+    return 5;
+}
+// PARSE TOKEN AND POPULATE SWITCH
+void populateSwitch(SWITCH * pSwitch, char tokens[][MAXWORD]) {
+    //https://stackoverflow.com/questions/5029840/convert-char-to-int-in-c-and-c
+    pSwitch -> switchID = tokens[0][3] - '0'; // eg: '1' - '0' = int 
+    if (strcmp(tokens[2], "null") == 0) {
+        pSwitch -> pswj = -1; // -1 indicates null
+    } else  {
+        pSwitch -> pswj = tokens[2][3] - '0';
+    }
+    if (strcmp(tokens[3], "null") == 0) {
+        pSwitch -> pswk = -1; // -1 indicates null
+    } else {
+        pSwitch -> pswk = tokens[3][3] - '0';
+    }
+
+    // parse lowIP-HighIP
+    int IPstrLen = strlen(tokens[4]);
+    string lowIPstr = "";
+    string highIPstr = "";
+    int flag = 0;
+    for (int i = 0; i < IPstrLen + 1; i++) {
+        if (tokens[4][i] == '-' and flag == 0) {
+            flag = 1;
+            continue; 
+        }
+        if (flag == 1) {
+            highIPstr += tokens[4][i];
+        } else {
+            lowIPstr += tokens[4][i];
+        }
+    }
+    int lowIPint = stoi(lowIPstr);
+    int highIPint = stoi(highIPstr);
+    pSwitch -> lowIP = lowIPint;
+    pSwitch -> highIP = highIPint;
+
+}
+
 int main(int argc, char *argv[]) {
     char tokens[10][MAXWORD];
-
+    
+    SWITCH pSwitch;
+    
     // parse the input 
         
     // open fifo
@@ -169,18 +232,21 @@ int main(int argc, char *argv[]) {
     } else if (argc == 6) {  // SWTICH PERSPECTIVE
         // pswi switch, TODO: error check argument
         for (int i = 1; i < 6; i++) {
+            memset(tokens[i - 1], 0, MAXWORD); 
             strcpy(tokens[i - 1], argv[i]);
-            // tokens[1] = "pswi"
-            // tokens[2] = "datafile"
-            // tokens[3] = "null//pswj"
-            // tokens[4] = "null/pswk"
-            // tokens[5] = "IPlow-IPhigh"
+            // tokens[0] = "pswi"
+            // tokens[1] = "datafile"
+            // tokens[2] = "null//pswj"
+            // tokens[3] = "null/pswk"
+            // tokens[4] = "IPlow-IPhigh"
         }
+        populateSwitch(&pSwitch, tokens);
+        printSwitch(&pSwitch);  
     } else {
         printf("invalid arguments\n");
         return 0;
     }
-    printToken(tokens, argc - 1);  
+    //printToken(tokens, argc - 1);  
 
     return 0;
 }
