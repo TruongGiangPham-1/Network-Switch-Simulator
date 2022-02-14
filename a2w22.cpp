@@ -147,8 +147,14 @@ void do_client (int fifoCS, int fifoSC)
     return;
 }
 
+void printToken(char tokens[][MAXWORD], int len) {
+    for (int i = 0; i < len; i++) {
+        printf("argument %d: %s\n", i, tokens[i]);
+    }
+}
 int main(int argc, char *argv[]) {
     char tokens[10][MAXWORD];
+
     // parse the input 
         
     // open fifo
@@ -156,22 +162,25 @@ int main(int argc, char *argv[]) {
     if (argc == 3 and strcmp(argv[1], "master") == 0) {
         // master switch
         for (int i = 1; i < 3; i++) {
-            strcpy(tokens[i], argv[i]);
+            strcpy(tokens[i - 1], argv[i]);
             // tokens[0] = "master"
             // tokens[1] = "nSwitch"
         }
-    } else if (argc == 6) {
+    } else if (argc == 6) {  // SWTICH PERSPECTIVE
         // pswi switch, TODO: error check argument
         for (int i = 1; i < 6; i++) {
-            strcpy(tokens[i], argv[i]);
+            strcpy(tokens[i - 1], argv[i]);
             // tokens[1] = "pswi"
             // tokens[2] = "datafile"
             // tokens[3] = "null//pswj"
             // tokens[4] = "null/pswk"
             // tokens[5] = "IPlow-IPhigh"
         }
+    } else {
+        printf("invalid arguments\n");
+        return 0;
     }
-
+    printToken(tokens, argc - 1);  
 
     return 0;
 }
