@@ -13,14 +13,36 @@
 #define NF 3		 // number of fields in each message
 
 #define MSG_KINDS 5
-typedef enum { STR, INT, FLOAT, DONE, ACK } KIND;	  // Message kinds
-char KINDNAME[][MAXWORD]= { "STR", "INT", "FLOAT", "DONE", "ACK" };
+typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
+char KINDNAME[][MAXWORD]= { "HELLO", "HELLO_ACK", "ASK", "ADD", "RELAY" };
 
-typedef struct { char  d[NF][MAXLINE]; } MSG_STR;
-typedef struct { int   d[NF]; }          MSG_INT;
-typedef struct { float d[NF]; }          MSG_FLOAT;
 
-typedef union { MSG_STR  mStr; MSG_INT mInt; MSG_FLOAT mFloat; } MSG;
+typedef struct {
+    int switchNUM;
+    int Nneighbor;
+    int lowIP;
+    int highIP;
+} HELLO_PACK;
+
+typedef struct {
+    int nothing;
+} HELLO_ACK_PACK;
+
+typedef struct {
+    int nothing;
+} ASK_PACK;
+
+typedef struct {
+    int nothing;
+} ADD_PACK;
+
+typedef struct {
+    int nothing;
+} RELAY_PACK;
+
+
+
+typedef union {HELLO_PACK pHello; HELLO_ACK_PACK pHelloAck; ASK_PACK pAsk; ADD_PACK pAdd; RELAY_PACK pRelay;} MSG;
 
 typedef struct { KIND kind; MSG msg; } FRAME;
 
@@ -53,9 +75,7 @@ MSG composeMSTR (const char *a, const char *b, const char *c)
     MSG  msg;
 
     memset( (char *) &msg, 0, sizeof(msg) );
-    strcpy(msg.mStr.d[0],a);
-    strcpy(msg.mStr.d[1],b);
-    strcpy(msg.mStr.d[2],c);
+
     return msg;
 }    
 // ------------------------------    
@@ -63,8 +83,6 @@ MSG composeMINT (int a, int b, int c)
 {
     MSG  msg;
 
-    memset( (char *) &msg, 0, sizeof(msg) );
-    msg.mInt.d[0]= a; msg.mInt.d[1]= b; msg.mInt.d[2]= c;
     return msg;
 }    
 // ------------------------------
@@ -72,8 +90,7 @@ MSG  composeMFLOAT (float a, float b, float c)
 {
     MSG  msg;
 
-    memset( (char *) &msg, 0, sizeof(msg) );
-    msg.mFloat.d[0]= a; msg.mFloat.d[1]= b; msg.mFloat.d[2]= c;
+   
     return msg;
 }
 // ----------------------------
@@ -108,92 +125,37 @@ void printFrame (const char *prefix, FRAME *frame)
 {
     MSG  msg= frame->msg;
     
-    printf ("%s [%s] ", prefix, KINDNAME[frame->kind]);
-    switch (frame->kind) {
-    case STR:
-        printf ("'%s' '%s' '%s'",
-	   	 msg.mStr.d[0], msg.mStr.d[1], msg.mStr.d[2]);
-        break;
-     case INT:
-         printf ("%d, %d, %d",
-	   	  msg.mInt.d[0], msg.mInt.d[1], msg.mInt.d[2]);
-         break;
-      case FLOAT:
-          printf ("%f, %f, %f",
-	   	   msg.mFloat.d[0], msg.mFloat.d[1], msg.mFloat.d[2]);
-          break;		   
-      case ACK: case DONE:
-          break;
-      default:
-          WARNING ("Unknown frame type (%d)\n", frame->kind);
-	  break;
-      }
-      printf("\n");
 }
 // ------------------------------
+
+
 
 // SERVER LOOP
 void do_server (int fifoCS, int fifoSC)
 {
-    MSG    msg;
-    FRAME  frame;
-
-    while(1) {
-       frame= rcvFrame(fifoCS);    	     
-       printFrame ("received ", &frame);
-       if (frame.kind == DONE) {printf ("Done\n"); return;}       
-
-       sendFrame(fifoSC, ACK, &msg);       
-    }
+    return;
 }
 
 // CLIENT LOOP
 void do_client (int fifoCS, int fifoSC)
 {
-    FRAME  frame;
-    MSG    msg;
-
-    msg= composeMSTR ("Edmonton", "Red Deer", "Calgary");
-    sendFrame (fifoCS, STR, &msg);
-    frame= rcvFrame(fifoSC);  printFrame("received ", &frame);
-
-    msg= composeMINT (10, 20, 30);
-    sendFrame (fifoCS, INT, &msg);
-    frame= rcvFrame(fifoSC);  printFrame("received ", &frame);
-
-    msg= composeMFLOAT (10.25, 20.50, 30.75);
-    sendFrame (fifoCS, FLOAT, &msg);
-    frame= rcvFrame(fifoSC);  printFrame("received ", &frame);
-
-    msg= composeMINT(0,0,0);
-    sendFrame (fifoCS, DONE, &msg);
+    return;
 }
 
 int main(int argc, char *argv[]) {
 
     // open fifo
-    int fifoCS, fifoSC;
+
+    if (argc == 3 and strcmp(argv[1], "master") == 0) {
+        // master switch
+    } else if (argc == 6) {
+        // pswi switch, TODO: error check argument
+
+    }
     
-    if (argc != 2) { 
-        printf("Usage: %s [-c|-s]\n", argv[0]); exit(0); 
-    }
+  
 
-    if ( (fifoCS= open("fifo-cs", O_RDWR)) < 0) {
-        FATAL ("%s: open '%s' failed \n", argv[0], "fifo-cs");
-    }
 
-    if ( (fifoSC= open("fifo-sc", O_RDWR)) < 0) {
-        FATAL ("%s: open '%s' failed \n", argv[0], "fifo-sc");
-    }
 
-    if ( strstr(argv[1], "-c") != NULL) {
-        do_client(fifoCS, fifoSC);
-    }
-
-    if ( strstr(argv[1], "-s") != NULL) {
-        do_server(fifoCS, fifoSC);
-    }
-
-    close(fifoCS); close(fifoSC);
     return 0;
 }

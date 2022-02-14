@@ -49,5 +49,32 @@ struct psw2 {
 };
 
 
+HELLO {
+   // 1. the switch number
+   // the numbers of neighbouring switches
+   // the range of IP address
+   int switchNum;
+   int Nneighbor;
+   int lowIP;
+   int highIP;
+} HELLOPACK;
 
+struct HELLO_ACK_PACK {
+    // no carry package;
+    int nothing;
+} HELLO_ACK_PACK;
+
+
+struct {
+    // does stuff
+} ASK_PACK;
+
+
+struct {
+
+} ADD_PACK;
+
+struct {
+
+} RELAY;
 
