@@ -15,6 +15,8 @@ using namespace std;
 #define MAXLINE   132
 #define MAXWORD    32
 #define MSG_KINDS 5
+#define MAX_SWITCH 7
+
 typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
 char KINDNAME[][MAXWORD]= { "HELLO", "HELLO_ACK", "ASK", "ADD", "RELAY" };
 
@@ -216,14 +218,60 @@ void populateMaster(MASTERSWITCH * master, char token[][MAXWORD]) {
 void doMasterPolling() {
 
 }
+// UPDATE fds incase more switch wants to connect
+void updateFDs() {
+    
+}
+
+string getfifoName(int x, int y) {
+    string name = "fifo-" + to_string(x) + "-" + to_string(y);
+    return name;
+}
+
+int openfifoRead(string name) {
+    string fifoname = "./" + name;
+    int fd = open(fifoname.c_str(), O_RDONLY); // this will block under other side is established
+    if (fd < 0) {
+        cerr << "cannot open named pipe for read" << endl;
+        unlink(name.c_str());
+        exit(EXIT_FAILURE);
+    }
+
+    return fd;   
+}
+int openfifoWrite(string name) {
+    string fifoname = "./" + name;
+    int fd = open(fifoname.c_str(), O_WRONLY);
+    if (fd < 0) {
+        cerr << "cannot open named pipe for write" << endl;
+        unlink(name.c_str());
+        exit(EXIT_FAILURE);
+    }
+    return fd;
+}
 
 // MASTER LOOP
-void do_master() {
+void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH][MAX_SWITCH]) {
+    int nswitch_ = masterswitch -> numSwitch;
+    pollfd pollfd[masterswitch -> numSwitch];
+    // SETUP KEYBOARD POLL
+    pollfd[0].fd = STDIN_FILENO;
+    pollfd[0].events = POLLIN;
+    pollfd[0].revents = 0;
+    // SETUP FILE POLL
+    for (int i = 0; i < nswitch_; i++) {
+        string outpipeName = getfifoName(0, i + 1);
+        string inpipeName = getfifoName(i + 1, 0);
+        fds[i][0] = openfifoRead(inpipeName);
+        fds[0][i] = openfifoWrite(outpipeName);
+    } 
+
     // 1. poll for 
-    printf("please enter info or exit\n");
-    while (true) {
-        doMasterPolling();
-    }
+    //printf("please enter info or exit\n");
+    //while (true) {
+    //    updateFDs();
+    //    doMasterPolling();
+    //}
 }
 // pSwitch loop
 void do_switch() {
@@ -232,12 +280,12 @@ void do_switch() {
 
 int main(int argc, char *argv[]) {
     char tokens[10][MAXWORD];
-    
+    int fds[MAX_SWITCH][MAX_SWITCH]; //fds[i][j] means fd for fifo-i-j
+
     SWITCH pSwitch;
     MASTERSWITCH master;
     
     // parse the input 
-        
     // open fifo
 
     if (argc == 3 and strcmp(argv[1], "master") == 0) {
@@ -249,7 +297,7 @@ int main(int argc, char *argv[]) {
             //do_master();
         }
         populateMaster(&master, tokens);
-        printf("nSWITCH: %d\n", master.numSwitch);
+        do_master(&master, fds);
     } else if (argc == 6) {  // SWTICH PERSPECTIVE
         // pswi switch, TODO: error check argument
         for (int i = 1; i < 6; i++) {
