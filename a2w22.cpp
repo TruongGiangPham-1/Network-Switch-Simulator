@@ -277,7 +277,8 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
     while (true) {
         //updateFDs();
         //doMasterPolling();
-        int pollret = poll(pollfds, nswitch_ + 1, 0); // 
+        int pollret = poll(pollfds, nswitch_ + 1, 1); // 
+        //cout << "pollred " << pollret << endl;
         if (pollret < 0) {
             cerr << "polling returned -1" << endl;
             exit(EXIT_FAILURE);
@@ -288,17 +289,23 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
             readbuff[strlen(readbuff) - 1] = '\0';  // clear \n character
             printf("received: %s\n", readbuff);
         }
-        if (pollfds[1].revents and POLLIN) { // poll psw1
+        if (pollfds[1].revents and POLLIN) { // poll psw1, revents keep happenin
+            memset(readbuff, 0, MAXWORD);
             int bytesread = read(pollfds[1].fd, readbuff, MAXWORD);
-            if (strcmp(readbuff, "HELLO") == 0) {
-                //send ACK
-                memset(writebuff, 0, MAXWORD);
-                strcpy(writebuff, "ACK");
-                write(fds[0][1], writebuff, MAXWORD);
+            if (bytesread == -1){
+                cerr << "read failed" << endl;
+                exit(EXIT_FAILURE);
+            } else if (bytesread == 0) {
+                //continue;
             }
+            //send ACK
+            printf("received from client %s\n", readbuff);
+            memset(writebuff, 0, MAXWORD);
+            strcpy(writebuff, "ACK");
+            write(fds[0][1], writebuff, MAXWORD);
+            pollfds[1].revents = 0;
+            pollfds[1].fd = fds[1][0];
         }
-    
-
     }
 }
 // pSwitch loop
@@ -340,7 +347,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     write(fds[pSwitch->switchID][0], writebuff, MAXWORD);
     while (true) {
         // todo; send HELLO and receive HELLO_ACK
-        int pollret = poll(pollfds, SWITCHPORTS_N, 0);
+        int pollret = poll(pollfds, SWITCHPORTS_N, 1);
         if (pollret < 0) {
             cerr << "pollret returned -1" << endl;
             exit(EXIT_FAILURE);
@@ -350,13 +357,13 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
             // received something
             memset(readbuff, 0, MAXWORD);
             int bytesread = read(pollfds[0].fd, readbuff, MAXWORD);
-            readbuff[strlen(readbuff) - 1] = '\0';
-            if (strcmp(readbuff, "ACK") == 0)
-                printf("received from master: %s\n", readbuff);
+            if (bytesread == 0) { // other end closed their pipe
+                continue;
+            }
+            printf("received from master: %s\n", readbuff);
+            pollfds[0].revents = 0;
         }
-
     } 
-
 }
 
 int main(int argc, char *argv[]) {
@@ -391,7 +398,8 @@ int main(int argc, char *argv[]) {
             // tokens[4] = "IPlow-IPhigh"
         }
         populateSwitch(&pSwitch, tokens);
-        printSwitch(&pSwitch);  
+        //printSwitch(&pSwitch);  
+        do_switch(&pSwitch, fds);
     } else {
         printf("invalid arguments\n");
         return 0;
