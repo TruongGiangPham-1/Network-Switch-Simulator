@@ -230,7 +230,7 @@ string getfifoName(int x, int y) {
 
 int openfifoRead(string name) {
     string fifoname = "./" + name;
-    int fd = open(fifoname.c_str(), O_RDONLY); // this will block under other side is established
+    int fd = open(fifoname.c_str(), O_RDONLY | O_NONBLOCK); // this will block under other side is established
     if (fd < 0) {
         cerr << "cannot open named pipe for read" << endl;
         unlink(name.c_str());
@@ -241,7 +241,8 @@ int openfifoRead(string name) {
 }
 int openfifoWrite(string name) {
     string fifoname = "./" + name;
-    int fd = open(fifoname.c_str(), O_WRONLY);
+//https://stackoverflow.com/questions/580013/how-do-i-perform-a-non-blocking-fopen-on-a-named-pipe-mkfifo
+    int fd = open(fifoname.c_str(), O_RDWR | O_NONBLOCK); // O_WRONLY dont work, cant open
     if (fd < 0) {
         cerr << "cannot open named pipe for write" << endl;
         unlink(name.c_str());
@@ -251,9 +252,10 @@ int openfifoWrite(string name) {
 }
 
 // MASTER LOOP
-void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH][MAX_SWITCH]) {
+void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
+    char readbuff[MAXWORD];
     int nswitch_ = masterswitch -> numSwitch;
-    pollfd pollfd[masterswitch -> numSwitch];
+    pollfd pollfd[nswitch_ + 1];
     // SETUP KEYBOARD POLL
     pollfd[0].fd = STDIN_FILENO;
     pollfd[0].events = POLLIN;
@@ -262,16 +264,28 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH][MAX_SWITCH]) {
     for (int i = 0; i < nswitch_; i++) {
         string outpipeName = getfifoName(0, i + 1);
         string inpipeName = getfifoName(i + 1, 0);
-        fds[i][0] = openfifoRead(inpipeName);
-        fds[0][i] = openfifoWrite(outpipeName);
+        fds[i + 1][0] = openfifoRead(inpipeName);
+        fds[0][i + 1] = openfifoWrite(outpipeName);
+        pollfd[i + 1].fd = fds[i + 1][0];
+        pollfd[i + 1].events = POLLIN;
     } 
 
-    // 1. poll for 
-    //printf("please enter info or exit\n");
-    //while (true) {
-    //    updateFDs();
-    //    doMasterPolling();
-    //}
+    // 1. poll, if pollfd.fd = -1, poll() will ignore; revent = 0;
+    printf("established file descriptors, waiting for HELLO\n");
+    while (true) {
+        //updateFDs();
+        //doMasterPolling();
+        int pollret = poll(pollfd, nswitch_ + 1, 0); // 
+        if (pollret < 0) {
+            cerr << "polling returned -1" << endl;
+            exit(EXIT_FAILURE);
+        }
+        if (pollfd[0].revents and POLLIN) {
+            memset(readbuff, 0, MAXWORD);
+            int bytesread = read(pollfd[0].fd, readbuff, MAXWORD);
+            printf("received: %s\n", readbuff);
+        }
+    }
 }
 // pSwitch loop
 void do_switch() {
@@ -280,7 +294,7 @@ void do_switch() {
 
 int main(int argc, char *argv[]) {
     char tokens[10][MAXWORD];
-    int fds[MAX_SWITCH][MAX_SWITCH]; //fds[i][j] means fd for fifo-i-j
+    int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]; //fds[i][j] means fd for fifo-i-j
 
     SWITCH pSwitch;
     MASTERSWITCH master;
