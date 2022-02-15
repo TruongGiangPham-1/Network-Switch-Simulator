@@ -16,6 +16,7 @@ using namespace std;
 #define MAXWORD    32
 #define MSG_KINDS 5
 #define MAX_SWITCH 7
+#define SWITCHPORTS_N 5
 
 typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
 char KINDNAME[][MAXWORD]= { "HELLO", "HELLO_ACK", "ASK", "ADD", "RELAY" };
@@ -254,20 +255,21 @@ int openfifoWrite(string name) {
 // MASTER LOOP
 void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     char readbuff[MAXWORD];
+    char writebuff[MAXWORD];
     int nswitch_ = masterswitch -> numSwitch;
-    pollfd pollfd[nswitch_ + 1];
+    pollfd pollfds[nswitch_ + 1];
     // SETUP KEYBOARD POLL
-    pollfd[0].fd = STDIN_FILENO;
-    pollfd[0].events = POLLIN;
-    pollfd[0].revents = 0;
+    pollfds[0].fd = STDIN_FILENO;
+    pollfds[0].events = POLLIN;
+    pollfds[0].revents = 0;
     // SETUP FILE POLL
     for (int i = 0; i < nswitch_; i++) {
         string outpipeName = getfifoName(0, i + 1);
         string inpipeName = getfifoName(i + 1, 0);
         fds[i + 1][0] = openfifoRead(inpipeName);
         fds[0][i + 1] = openfifoWrite(outpipeName);
-        pollfd[i + 1].fd = fds[i + 1][0];
-        pollfd[i + 1].events = POLLIN;
+        pollfds[i + 1].fd = fds[i + 1][0];
+        pollfds[i + 1].events = POLLIN;
     } 
 
     // 1. poll, if pollfd.fd = -1, poll() will ignore; revent = 0;
@@ -275,16 +277,25 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
     while (true) {
         //updateFDs();
         //doMasterPolling();
-        int pollret = poll(pollfd, nswitch_ + 1, 0); // 
+        int pollret = poll(pollfds, nswitch_ + 1, 0); // 
         if (pollret < 0) {
             cerr << "polling returned -1" << endl;
             exit(EXIT_FAILURE);
         }
-        if (pollfd[0].revents and POLLIN) {
+        if (pollfds[0].revents and POLLIN) {
             memset(readbuff, 0, MAXWORD);
-            int bytesread = read(pollfd[0].fd, readbuff, MAXWORD); // theres a \n character
+            int bytesread = read(pollfds[0].fd, readbuff, MAXWORD); // theres a \n character
             readbuff[strlen(readbuff) - 1] = '\0';  // clear \n character
             printf("received: %s\n", readbuff);
+        }
+        if (pollfds[1].revents and POLLIN) { // poll psw1
+            int bytesread = read(pollfds[1].fd, readbuff, MAXWORD);
+            if (strcmp(readbuff, "HELLO") == 0) {
+                //send ACK
+                memset(writebuff, 0, MAXWORD);
+                strcpy(writebuff, "ACK");
+                write(fds[0][1], writebuff, MAXWORD);
+            }
         }
     
 
@@ -302,11 +313,49 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     if (pSwitch->pswj != -1) {
         fifo_i_j = getfifoName(pSwitch->switchID, pSwitch->pswj);
         fifo_j_i = getfifoName(pSwitch->pswj, pSwitch->switchID);
+        fds[pSwitch->pswj][pSwitch->switchID] = openfifoRead(fifo_j_i);
+        fds[pSwitch->switchID][pSwitch->pswj] = openfifoWrite(fifo_i_j);
     }
     if (pSwitch->pswk != -1) {
         fifo_i_k = getfifoName(pSwitch->switchID, pSwitch->pswk);
         fifo_k_i = getfifoName(pSwitch->pswk, pSwitch->switchID);
+        fds[pSwitch->pswk][pSwitch->switchID] = openfifoRead(fifo_k_i);
+        fds[pSwitch->switchID][pSwitch->pswk] = openfifoWrite(fifo_i_k);
     }
+    fds[0][pSwitch->switchID] = openfifoRead(fifo_master_i);
+    fds[pSwitch->switchID][0] = openfifoWrite(fifo_i_master);
+
+    pollfd pollfds[SWITCHPORTS_N]; // = 5
+    //pollfds[0] = fifo-0-i; pollfds[1]... ..pollfds[4] = keyboard
+    pollfds[0].fd = fds[0][pSwitch->switchID];
+    pollfds[0].events = POLLIN; 
+    pollfds[1].fd = -1;
+    pollfds[2].fd = -1;
+    pollfds[3].fd = -1;
+    pollfds[4].fd = -1;
+    char readbuff[MAXWORD];
+    char writebuff[MAXWORD];
+    memset(writebuff, 0, MAXWORD);
+    strcpy(writebuff, "HELLO");
+    write(fds[pSwitch->switchID][0], writebuff, MAXWORD);
+    while (true) {
+        // todo; send HELLO and receive HELLO_ACK
+        int pollret = poll(pollfds, SWITCHPORTS_N, 0);
+        if (pollret < 0) {
+            cerr << "pollret returned -1" << endl;
+            exit(EXIT_FAILURE);
+        }
+        // send HELLO
+        if (pollfds[0].revents and POLLIN) {
+            // received something
+            memset(readbuff, 0, MAXWORD);
+            int bytesread = read(pollfds[0].fd, readbuff, MAXWORD);
+            readbuff[strlen(readbuff) - 1] = '\0';
+            if (strcmp(readbuff, "ACK") == 0)
+                printf("received from master: %s\n", readbuff);
+        }
+
+    } 
 
 }
 
