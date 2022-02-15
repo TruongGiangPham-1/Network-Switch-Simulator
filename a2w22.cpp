@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <string>
 #include <vector>
+#include <poll.h>
 
 
 using namespace std;
@@ -27,6 +28,7 @@ typedef struct {
 
 typedef struct {
     int numSwitch;
+    // need 2d array of char maybe
     
 } MASTERSWITCH;
 
@@ -145,18 +147,6 @@ void printFrame (const char *prefix, FRAME *frame)
 
 
 
-// SERVER LOOP
-void do_server (int fifoCS, int fifoSC)
-{
-    return;
-}
-
-// CLIENT LOOP
-void do_client (int fifoCS, int fifoSC)
-{
-    return;
-}
-
 void printToken(char tokens[][MAXWORD], int len) {
     for (int i = 0; i < len; i++) {
         printf("argument %d: %s\n", i, tokens[i]);
@@ -213,10 +203,38 @@ void populateSwitch(SWITCH * pSwitch, char tokens[][MAXWORD]) {
 
 }
 
+
+// POPULATE MASTER SWITCH STRUCT
+void populateMaster(MASTERSWITCH * master, char token[][MAXWORD]) {
+    char tempStr[MAXWORD];
+    memset(tempStr, 0, MAXWORD);
+    strcpy(tempStr, token[1]);
+    string nSwitchStr = string(tempStr);
+    master -> numSwitch = stoi(nSwitchStr);
+}
+
+void doMasterPolling() {
+
+}
+
+// MASTER LOOP
+void do_master() {
+    // 1. poll for 
+    printf("please enter info or exit\n");
+    while (true) {
+        doMasterPolling();
+    }
+}
+// pSwitch loop
+void do_switch() {
+
+}
+
 int main(int argc, char *argv[]) {
     char tokens[10][MAXWORD];
     
     SWITCH pSwitch;
+    MASTERSWITCH master;
     
     // parse the input 
         
@@ -228,7 +246,10 @@ int main(int argc, char *argv[]) {
             strcpy(tokens[i - 1], argv[i]);
             // tokens[0] = "master"
             // tokens[1] = "nSwitch"
+            //do_master();
         }
+        populateMaster(&master, tokens);
+        printf("nSWITCH: %d\n", master.numSwitch);
     } else if (argc == 6) {  // SWTICH PERSPECTIVE
         // pswi switch, TODO: error check argument
         for (int i = 1; i < 6; i++) {
