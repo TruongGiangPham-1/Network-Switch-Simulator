@@ -282,13 +282,31 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
         }
         if (pollfd[0].revents and POLLIN) {
             memset(readbuff, 0, MAXWORD);
-            int bytesread = read(pollfd[0].fd, readbuff, MAXWORD);
+            int bytesread = read(pollfd[0].fd, readbuff, MAXWORD); // theres a \n character
+            readbuff[strlen(readbuff) - 1] = '\0';  // clear \n character
             printf("received: %s\n", readbuff);
         }
+    
+
     }
 }
 // pSwitch loop
-void do_switch() {
+void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
+    // establish connection with master/pswj/pswk
+    string fifo_i_master = getfifoName(pSwitch -> switchID, 0);
+    string fifo_master_i = getfifoName(0, pSwitch->switchID);  // READ
+    string fifo_i_j;
+    string fifo_j_i;  // READ
+    string fifo_i_k;
+    string fifo_k_i;  // READ
+    if (pSwitch->pswj != -1) {
+        fifo_i_j = getfifoName(pSwitch->switchID, pSwitch->pswj);
+        fifo_j_i = getfifoName(pSwitch->pswj, pSwitch->switchID);
+    }
+    if (pSwitch->pswk != -1) {
+        fifo_i_k = getfifoName(pSwitch->switchID, pSwitch->pswk);
+        fifo_k_i = getfifoName(pSwitch->pswk, pSwitch->switchID);
+    }
 
 }
 
