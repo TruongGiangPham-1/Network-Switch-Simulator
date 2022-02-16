@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <poll.h>
+#include <utility> // for PAIR
 
 
 using namespace std;
@@ -18,6 +19,7 @@ using namespace std;
 #define MAX_SWITCH 7
 #define SWITCHPORTS_N 5
 
+typedef pair<int, int> PII; // PII = pair int int
 typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
 char KINDNAME[][MAXWORD]= { "HELLO", "HELLO_ACK", "ASK", "ADD", "RELAY" };
 
@@ -145,12 +147,47 @@ FRAME rcvFrame (int fd)
 // ------------------------------
 void printFrame (const char *prefix, FRAME *frame)
 {
+    // prefix = "received"
     MSG  msg= frame->msg;
+    printf("%s [%s] \n", prefix, KINDNAME[frame->kind]);
+    switch (frame->kind)
+    {
+    case HELLO/* constant-expression */:
+        /* code */
+        printf("switchID: [%d], nNeighbor: [%d], lowIP: [%d], highIP: [%d]\n" );
+        break;
+    case HELLO_ACK:
+        
+        break;
+    default:
+        break;
+    }
     
 }
 // ------------------------------
 
-
+PII getLowIP_HighIP(const char * ips) {
+    // ips = "lowip=highip"
+    int IPstrLen = strlen(ips);
+    string lowIPstr = "";
+    string highIPstr = "";
+    int flag = 0;
+    for (int i = 0; i < IPstrLen + 1; i++) {
+        if (ips[i] == '-' and flag == 0) {
+            flag = 1;
+            continue; 
+        }
+        if (flag == 1) {
+            highIPstr += ips[i];
+        } else {
+            lowIPstr += ips[i];
+        }
+    }
+    int lowIPint = stoi(lowIPstr);
+    int highIPint = stoi(highIPstr);
+    PII p = make_pair(lowIPint, highIPint);
+    return p;
+}
 
 void printToken(char tokens[][MAXWORD], int len) {
     for (int i = 0; i < len; i++) {
@@ -186,25 +223,9 @@ void populateSwitch(SWITCH * pSwitch, char tokens[][MAXWORD]) {
     }
 
     // parse lowIP-HighIP
-    int IPstrLen = strlen(tokens[4]);
-    string lowIPstr = "";
-    string highIPstr = "";
-    int flag = 0;
-    for (int i = 0; i < IPstrLen + 1; i++) {
-        if (tokens[4][i] == '-' and flag == 0) {
-            flag = 1;
-            continue; 
-        }
-        if (flag == 1) {
-            highIPstr += tokens[4][i];
-        } else {
-            lowIPstr += tokens[4][i];
-        }
-    }
-    int lowIPint = stoi(lowIPstr);
-    int highIPint = stoi(highIPstr);
-    pSwitch -> lowIP = lowIPint;
-    pSwitch -> highIP = highIPint;
+    PII ipPair = getLowIP_HighIP(tokens[4]);
+    pSwitch -> lowIP = ipPair.first;
+    pSwitch -> highIP = ipPair.second;
 
 }
 
@@ -387,7 +408,7 @@ int main(int argc, char *argv[]) {
             //do_master();
         }
         populateMaster(&master, tokens);
-        do_master(&master, fds);
+        //do_master(&master, fds);
     } else if (argc == 6) {  // SWTICH PERSPECTIVE
         // pswi switch, TODO: error check argument
         for (int i = 1; i < 6; i++) {
@@ -400,8 +421,8 @@ int main(int argc, char *argv[]) {
             // tokens[4] = "IPlow-IPhigh"
         }
         populateSwitch(&pSwitch, tokens);
-        //printSwitch(&pSwitch);  
-        do_switch(&pSwitch, fds);
+        printSwitch(&pSwitch);  
+        //do_switch(&pSwitch, fds);
     } else {
         printf("invalid arguments\n");
         return 0;
