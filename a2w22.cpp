@@ -88,21 +88,23 @@ void WARNING (const char *fmt, ... )
 
 
 // ------------------------------
-MSG composeHELLOmsg (const char *a, const char *b, const char *c)
+MSG composeHELLOmsg (int switchID, int nNeighbor, int lowIP, int highIP)
 {
     MSG  msg;
-
-
     memset( (char *) &msg, 0, sizeof(msg) );
-
-
+    //char helloStr[] = "HELLO";
+    msg.pHello.switchNUM = switchID;
+    msg.pHello.Nneighbor = nNeighbor;
+    msg.pHello.lowIP = lowIP;
+    msg.pHello.highIP = highIP;
     return msg;
 }    
 // ------------------------------    
-MSG composeACKmsg (int a, int b, int c)
+MSG composeACKmsg ()
 {
     MSG  msg;
-
+    memset( (char *) &msg, 0, sizeof(msg) );
+    msg.pHelloAck.nothing = 0; // dummy value
     return msg;
 }    
 // ------------------------------
@@ -296,7 +298,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
                 cerr << "read failed" << endl;
                 exit(EXIT_FAILURE);
             } else if (bytesread == 0) {
-                //continue;
+                continue;
             }
             //send ACK
             printf("received from client %s\n", readbuff);
@@ -358,7 +360,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
             memset(readbuff, 0, MAXWORD);
             int bytesread = read(pollfds[0].fd, readbuff, MAXWORD);
             if (bytesread == 0) { // other end closed their pipe
-                continue;
+                //continue;
             }
             printf("received from master: %s\n", readbuff);
             pollfds[0].revents = 0;
