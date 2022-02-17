@@ -45,7 +45,11 @@ typedef struct {
 typedef struct {
     int numSwitch;
     // need 2d array of char maybe
-    SWITCH switchArray[MAX_SWITCH]; // array of switches for 'info' command
+    //SWITCH switchArray[MAX_SWITCH]; // array of switches for 'info' command
+    int helloCount;
+    int askCount;
+    int ackCount;
+    int addCount;
     
 } MASTERSWITCH;
 
@@ -263,6 +267,10 @@ void populateMaster(MASTERSWITCH * master, char token[][MAXWORD]) {
     strcpy(tempStr, token[1]);
     string nSwitchStr = string(tempStr);
     master -> numSwitch = stoi(nSwitchStr);
+    master->ackCount = 0;
+    master->addCount = 0;
+    master->askCount = 0;
+    master->helloCount = 0;
 }
 
 void doMasterPolling() {
@@ -307,29 +315,33 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray) {
     switch (frame->kind)
     {
     case HELLO:
-        msg = composeACKmsg();
-        sendFrame(fd, HELLO_ACK, &msg);
-        break;
+        {
+            msg = composeACKmsg();
+            sendFrame(fd, HELLO_ACK, &msg);
+            break;
+        }
     case ASK:  // compose ADD_PACK
-        int dIP_toASk = ((frame->msg).pAsk).destIP;
-        bool found = false;
-        int switchIndex = -1;
-        for (int i = 0; i < sArray.size(); i++) {
-            if (sArray[i].lowIP <= dIP_toASk and dIP_toASk <= sArray[i].highIP) {
-                found = true;
-                break;
+        {
+            int dIP_toASk = ((frame->msg).pAsk).destIP;
+            bool found = false;
+            int switchIndex = -1;
+            for (int i = 0; i < sArray.size(); i++) {
+                if (sArray[i].lowIP <= dIP_toASk and dIP_toASk <= sArray[i].highIP) {
+                    found = true;
+                    break;
+                }
             }
+            if ( switchIndex == -1) {  // no found == make DROP rule
+                msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0); // eg (0-1000, 300-300, DROP, 0)
+                sendFrame(fd, ADD, &msg);
+            } else {
+                msg = composeADDmsg(sArray[switchIndex].lowIP,sArray[switchIndex].highIP, FORWARD, switchIndex); 
+                sendFrame(fd, ADD, &msg);
+            }
+            break;
         }
-        if ( switchIndex == -1) {  // no found == make DROP rule
-            msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0); // eg (0-1000, 300-300, DROP, 0)
-            sendFrame(fd, ADD, &msg);
-        } else {
-            msg = composeADDmsg(sArray[switchIndex].lowIP,sArray[switchIndex].highIP, FORWARD, switchIndex); 
-            sendFrame(fd, ADD, &msg);
-            
-        }
-        break;
     default:
+        printf("default\n");
         break;
     }
 }
@@ -356,6 +368,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
     // 1. poll, if pollfd.fd = -1, poll() will ignore; revent = 0;
     MSG msg;
     FRAME frame;
+    vector<SWITCH> sArray;
     printf("established file descriptors, waiting for HELLO\n");
     while (true) {
         //updateFDs();
@@ -378,12 +391,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
                 if (pollfds[i].fd == -1) continue; // other end closed pipe so rcvFrame() changed fd to -1
                 printFrame("recieved ", &frame); 
-                if (frame.kind == HELLO) {
-                    // send ACK
-                    msg = composeACKmsg();
-                    sendFrame(fds[0][i], HELLO_ACK, &msg);
-                    
-                }
+                parseAndSendToSwitch(fds[0][i], &frame, sArray);
                 pollfds[i].revents = 0;
             }
         }
