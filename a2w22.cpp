@@ -129,7 +129,7 @@ void sendFrame (int fd, KIND kind, MSG *msg)
     write (fd, (char *) &frame, sizeof(frame));
 }
 
-FRAME rcvFrame (int fd)
+FRAME rcvFrame (int fd, struct pollfd* pollfds, int index)
 {
     int    len; 
     FRAME  frame;
@@ -140,6 +140,9 @@ FRAME rcvFrame (int fd)
     if (len != sizeof(frame))
         WARNING ("Received frame has length= %d (expected= %d)\n",
 		  len, sizeof(frame));
+    if (len == 0) {
+        pollfds[index].fd = -1; // means that othe end have closed pipe 
+    }
     return frame;		  
 }
   
@@ -297,6 +300,8 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
     } 
 
     // 1. poll, if pollfd.fd = -1, poll() will ignore; revent = 0;
+    MSG msg;
+    FRAME frame;
     printf("established file descriptors, waiting for HELLO\n");
     while (true) {
         //updateFDs();
@@ -313,22 +318,19 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
             readbuff[strlen(readbuff) - 1] = '\0';  // clear \n character
             printf("received: %s\n", readbuff);
         }
-        if (pollfds[1].revents and POLLIN) { // poll psw1, revents keep happenin
-            memset(readbuff, 0, MAXWORD);
-            int bytesread = read(pollfds[1].fd, readbuff, MAXWORD);
-            if (bytesread == -1){
-                cerr << "read failed" << endl;
-                exit(EXIT_FAILURE);
-            } else if (bytesread == 0) {
-                continue;
+        for (int i = 1; i < nswitch_ + 1; i++) {
+            if (pollfds[i].revents and POLLIN) {
+                // something to read
+                frame = rcvFrame(pollfds[i].fd, pollfds, i);
+                if (pollfds[i].fd == -1) continue; // other end closed pipe so rcvFrame() chaned fd
+                printFrame("recieved ", &frame); 
+                if (frame.kind == HELLO) {
+                    // send ACK
+                    msg = composeACKmsg();
+                    sendFrame(fds[0][i], HELLO_ACK, &msg);
+                }
+                pollfds[i].revents = 0;
             }
-            //send ACK
-            printf("received from client %s\n", readbuff);
-            memset(writebuff, 0, MAXWORD);
-            strcpy(writebuff, "ACK");
-            write(fds[0][1], writebuff, MAXWORD);
-            pollfds[1].revents = 0;
-            pollfds[1].fd = fds[1][0];
         }
     }
 }
@@ -368,7 +370,11 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     char writebuff[MAXWORD];
     memset(writebuff, 0, MAXWORD);
     strcpy(writebuff, "HELLO");
-    write(fds[pSwitch->switchID][0], writebuff, MAXWORD);
+    //write(fds[pSwitch->switchID][0], writebuff, MAXWORD);
+    FRAME frame;
+    MSG msg;
+    msg = composeHELLOmsg(pSwitch->switchID, 0, pSwitch->lowIP, pSwitch->highIP);
+    sendFrame(fds[pSwitch->switchID][0], HELLO, &msg);
     while (true) {
         // todo; send HELLO and receive HELLO_ACK
         int pollret = poll(pollfds, SWITCHPORTS_N, 1);
@@ -376,17 +382,17 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
             cerr << "pollret returned -1" << endl;
             exit(EXIT_FAILURE);
         }
+        // poll keyboard
         // send HELLO
-        if (pollfds[0].revents and POLLIN) {
-            // received something
-            memset(readbuff, 0, MAXWORD);
-            int bytesread = read(pollfds[0].fd, readbuff, MAXWORD);
-            if (bytesread == 0) { // other end closed their pipe
-                //continue;
+        for (int i = 0; i < SWITCHPORTS_N - 1; i++) {  // check everything exept keyboard[0 - 3]
+            if (pollfds[i].revents and POLLIN) {
+                frame = rcvFrame(pollfds[i].fd, pollfds, i);
+                if (pollfds[i].fd == -1) continue; //closed
+                if (frame.kind == HELLO_ACK) {
+                    printFrame("received ACK: ", &frame);
+                }
             }
-            printf("received from master: %s\n", readbuff);
-            pollfds[0].revents = 0;
-        }
+        } 
     } 
 }
 
@@ -409,7 +415,7 @@ int main(int argc, char *argv[]) {
             //do_master();
         }
         populateMaster(&master, tokens);
-        //do_master(&master, fds);
+        do_master(&master, fds);
     } else if (argc == 6) {  // SWTICH PERSPECTIVE
         // pswi switch, TODO: error check argument
         for (int i = 1; i < 6; i++) {
@@ -422,8 +428,8 @@ int main(int argc, char *argv[]) {
             // tokens[4] = "IPlow-IPhigh"
         }
         populateSwitch(&pSwitch, tokens);
-        printSwitch(&pSwitch);  
-        //do_switch(&pSwitch, fds);
+        //printSwitch(&pSwitch);  
+        do_switch(&pSwitch, fds);
     } else {
         printf("invalid arguments\n");
         return 0;
