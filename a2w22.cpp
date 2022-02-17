@@ -313,13 +313,20 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray) {
     case ASK:  // compose ADD_PACK
         int dIP_toASk = (frame->msg).pAsk.destIP;
         bool found = false;
+        int switchIndex = -1;
         for (int i = 0; i < sArray.size(); i++) {
             if (sArray[i].lowIP <= dIP_toASk and dIP_toASk <= sArray[i].highIP) {
-
+                found = true;
+                break;
             }
         }
-        msg = composeADDmsg(1,1, FORWARD, 1); 
-        break;
+        if ( switchIndex == -1) {  // no found == make DROP rule
+            msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0); // eg (0-1000, 300-300, DROP, 0)
+            sendFrame(fd, ADD, &msg);
+        } else {
+            msg = composeADDmsg(sArray[switchIndex].lowIP,sArray[switchIndex].highIP, FORWARD, switchIndex); 
+            break;
+        }
     
     default:
         break;
