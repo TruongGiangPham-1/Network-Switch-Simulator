@@ -309,13 +309,15 @@ int openfifoWrite(string name) {
     return fd;
 }
 
-void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray) {
+void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERSWITCH * master) {
     // parse Frame and send to fd // 
     MSG msg;
     switch (frame->kind)
     {
     case HELLO:
         {
+            master->helloCount += 1;
+            master->ackCount += 1;
             msg = composeACKmsg();
             sendFrame(fd, HELLO_ACK, &msg);
             break;
@@ -338,6 +340,8 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray) {
                 msg = composeADDmsg(sArray[switchIndex].lowIP,sArray[switchIndex].highIP, FORWARD, switchIndex); 
                 sendFrame(fd, ADD, &msg);
             }
+            master->ackCount +=1;
+            master->addCount +=1;
             break;
         }
     default:
