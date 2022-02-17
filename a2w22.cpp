@@ -154,7 +154,8 @@ void printFrame (const char *prefix, FRAME *frame)
     {
     case HELLO/* constant-expression */:
         /* code */
-        printf("switchID: [%d], nNeighbor: [%d], lowIP: [%d], highIP: [%d]\n" );
+        printf("switchID: [%d], nNeighbor: [%d], lowIP: [%d], highIP: [%d]\n", msg.pHello.switchNUM, msg.pHello.Nneighbor, 
+               msg.pHello.lowIP, msg.pHello.highIP);
         break;
     case HELLO_ACK:
         
@@ -392,7 +393,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
 int main(int argc, char *argv[]) {
     char tokens[10][MAXWORD];
     int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]; //fds[i][j] means fd for fifo-i-j
-
+    
     SWITCH pSwitch;
     MASTERSWITCH master;
     
@@ -428,6 +429,6 @@ int main(int argc, char *argv[]) {
         return 0;
     }
     //printToken(tokens, argc - 1);  
-
+    
     return 0;
 }
