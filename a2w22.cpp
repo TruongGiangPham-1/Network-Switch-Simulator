@@ -22,6 +22,17 @@ using namespace std;
 typedef pair<int, int> PII; // PII = pair int int
 typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
 char KINDNAME[][MAXWORD]= { "HELLO", "HELLO_ACK", "ASK", "ADD", "RELAY" };
+typedef enum {FORWARD, DROP} tableACTION;    // forward table action
+
+typedef struct {  // each switch has vector of fTABLEROW
+    int scrIP_lo;
+    int scrIP_hi;
+    int destIP_lo;
+    int destIP_hi;
+    tableACTION ACTIONTYPE;
+    int actionVAL;
+    int pktCount;
+} fTABLEROW;
 
 typedef struct {
     int switchID;
@@ -34,6 +45,7 @@ typedef struct {
 typedef struct {
     int numSwitch;
     // need 2d array of char maybe
+    SWITCH switchArray[MAX_SWITCH]; // array of switches for 'info' command
     
 } MASTERSWITCH;
 
@@ -49,11 +61,18 @@ typedef struct {
 } HELLO_ACK_PACK;
 
 typedef struct {
-    int nothing;
+    int switchID;  // just in case
+    int scrIP;
+    int destIP;  // ask for this destIP
+
 } ASK_PACK;
 
 typedef struct {
     int nothing;
+    int destIP_lo;
+    int destIP_hi;
+    tableACTION ACTIONTYPE;
+    int actionVAL;
 } ADD_PACK;
 
 typedef struct {
@@ -110,10 +129,13 @@ MSG composeACKmsg ()
     return msg;
 }    
 // ------------------------------
-MSG  composeADDmsg (float a, float b, float c)
+MSG  composeADDmsg (int dest_lo, int dest_hi, tableACTION action, int actionVAL)
 {
     MSG  msg;
-
+    msg.pAdd.ACTIONTYPE = action;
+    msg.pAdd.actionVAL = actionVAL;
+    msg.pAdd.destIP_lo = dest_lo;
+    msg.pAdd.destIP_hi = dest_hi;
    
     return msg;
 }
@@ -279,6 +301,30 @@ int openfifoWrite(string name) {
     return fd;
 }
 
+void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray) {
+    // parse Frame and send to fd // 
+    MSG msg;
+    switch (frame->kind)
+    {
+    case HELLO:
+        msg = composeACKmsg();
+        sendFrame(fd, HELLO_ACK, &msg);
+        break;
+    case ASK:  // compose ADD_PACK
+        int dIP_toASk = (frame->msg).pAsk.destIP;
+        bool found = false;
+        for (int i = 0; i < sArray.size(); i++) {
+            if (sArray[i].lowIP <= dIP_toASk and dIP_toASk <= sArray[i].highIP) {
+
+            }
+        }
+        msg = composeADDmsg(1,1, FORWARD, 1); 
+        break;
+    
+    default:
+        break;
+    }
+}
 // MASTER LOOP
 void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     char readbuff[MAXWORD];
@@ -298,7 +344,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
         pollfds[i + 1].fd = fds[i + 1][0];
         pollfds[i + 1].events = POLLIN;
     } 
-
+    int switchIndex = 0; // whenever switch connect, we update switch array
     // 1. poll, if pollfd.fd = -1, poll() will ignore; revent = 0;
     MSG msg;
     FRAME frame;
@@ -322,12 +368,13 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
             if (pollfds[i].revents and POLLIN) {
                 // something to read
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
-                if (pollfds[i].fd == -1) continue; // other end closed pipe so rcvFrame() chaned fd
+                if (pollfds[i].fd == -1) continue; // other end closed pipe so rcvFrame() changed fd to -1
                 printFrame("recieved ", &frame); 
                 if (frame.kind == HELLO) {
                     // send ACK
                     msg = composeACKmsg();
                     sendFrame(fds[0][i], HELLO_ACK, &msg);
+                    
                 }
                 pollfds[i].revents = 0;
             }

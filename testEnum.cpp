@@ -33,6 +33,7 @@ int main() {
     printKind(ADD);
     printKind(RELAY);
 
+    int MSG;
 
     return 0;
 }
