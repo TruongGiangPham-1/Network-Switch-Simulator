@@ -311,7 +311,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray) {
         sendFrame(fd, HELLO_ACK, &msg);
         break;
     case ASK:  // compose ADD_PACK
-        int dIP_toASk = (frame->msg).pAsk.destIP;
+        int dIP_toASk = ((frame->msg).pAsk).destIP;
         bool found = false;
         int switchIndex = -1;
         for (int i = 0; i < sArray.size(); i++) {
@@ -325,9 +325,10 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray) {
             sendFrame(fd, ADD, &msg);
         } else {
             msg = composeADDmsg(sArray[switchIndex].lowIP,sArray[switchIndex].highIP, FORWARD, switchIndex); 
-            break;
+            sendFrame(fd, ADD, &msg);
+            
         }
-    
+        break;
     default:
         break;
     }
