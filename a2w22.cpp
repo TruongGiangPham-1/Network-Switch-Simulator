@@ -349,7 +349,7 @@ void parseKeyboardMaster(const char * keyboardInput, vector<SWITCH>&sArray) {
     } 
 }
 // --------------------------------------------------------------------------------
-void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERSWITCH * master) {
+void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERSWITCH * master, SWITCH * sw) {
     // parse Frame and send to fd // 
     MSG msg;
     switch (frame->kind)
@@ -391,6 +391,10 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
             master->ackCount +=1;
             master->addCount +=1;
             break;
+        }
+    case HELLO_ACK:
+        {
+            printFrame("recieved: ", frame);
         }
     default:
         printf("default\n");
@@ -443,7 +447,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
                 if (pollfds[i].fd == -1) continue; // other end closed pipe so rcvFrame() changed fd to -1
                 printFrame("recieved ", &frame); 
-                parseAndSendToSwitch(fds[0][i], &frame, sArray, masterswitch);
+                parseAndSendToSwitch(fds[0][i], &frame, sArray, masterswitch, nullptr);
                 pollfds[i].revents = 0;
             }
         }
