@@ -18,12 +18,13 @@ using namespace std;
 #define MSG_KINDS 5
 #define MAX_SWITCH 7
 #define SWITCHPORTS_N 5
+#define MAXIP 1000
 
 typedef pair<int, int> PII; // PII = pair int int
 typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
 char KINDNAME[][MAXWORD]= { "HELLO", "HELLO_ACK", "ASK", "ADD", "RELAY" };
 typedef enum {FORWARD, DROP} tableACTION;    // forward table action
-
+char ACTIONNAME[][MAXWORD] = {"FORWARD", "DROP"};
 typedef struct {  // each switch has vector of fTABLEROW
     int scrIP_lo;
     int scrIP_hi;
@@ -312,7 +313,34 @@ int openfifoWrite(string name) {
     }
     return fd;
 }
+// KEYBOARD ----------------------------------------------------------------
+void parseKeyboard(const char * keyboardInput) {
+    // print stuff/
+    if (strcmp(keyboardInput, "info") == 0) {
 
+    }
+}
+void printInfoMaster(vector<SWITCH>&sArray) {
+    // mode == master or switch
+    for (int i = 0; i < sArray.size(); i++) {
+        string port3 = to_string(sArray[i].lowIP) + "-" + to_string(sArray[i].highIP);
+        printf("Switch information:\n");
+        printf("[psw %d] port1= %d, port2= %d, port3= %s", 
+            sArray[i].switchID, sArray[i].pswj, sArray[i].pswk, port3.c_str());
+    }
+    return;
+}
+void printInfoSwitch(vector<fTABLEROW>&forwardTable) {
+   for (int i = 0; i < forwardTable.size(); i++) {
+
+       // I realized i can just do %d-%d instead of above
+       printf("[%d] (scrIP= %d-%d, destIP= %d-%d, action=%s:%d, pktCount= %d",
+        i, forwardTable[i].scrIP_lo, forwardTable[i].scrIP_hi, forwardTable[i].destIP_lo, 
+        forwardTable[i].destIP_hi, ACTIONNAME[forwardTable[i].ACTIONTYPE], forwardTable[i].actionVAL, 
+        forwardTable[i].pktCount);
+   } 
+}
+// --------------------------------------------------------------------------------
 void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERSWITCH * master) {
     // parse Frame and send to fd // 
     MSG msg;
@@ -395,11 +423,11 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
             cerr << "polling returned -1" << endl;
             exit(EXIT_FAILURE);
         }
-        if (pollfds[0].revents and POLLIN) {
+        if (pollfds[0].revents and POLLIN) {  // keyboard poll
             memset(readbuff, 0, MAXWORD);
             int bytesread = read(pollfds[0].fd, readbuff, MAXWORD); // theres a \n character
             readbuff[strlen(readbuff) - 1] = '\0';  // clear \n character
-            printf("received: %s\n", readbuff);
+            //printf("received: %s\n", readbuff);
         }
         for (int i = 1; i < nswitch_ + 1; i++) {
             if (pollfds[i].revents and POLLIN) {
@@ -474,7 +502,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
         } 
     } 
 }
-
+// ----------------------------------------------------------------------------------
 int main(int argc, char *argv[]) {
     char tokens[10][MAXWORD];
     int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]; //fds[i][j] means fd for fifo-i-j
