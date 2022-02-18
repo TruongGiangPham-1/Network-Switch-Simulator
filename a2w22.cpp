@@ -320,6 +320,14 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
             master->ackCount += 1;
             msg = composeACKmsg();
             sendFrame(fd, HELLO_ACK, &msg);
+            SWITCH incomingSwitch = {
+                .highIP = (frame->msg).pHello.highIP,
+                .lowIP = (frame->msg).pHello.lowIP,
+                .pswj = 0,
+                .pswk = 0,
+                .switchID = (frame->msg).pHello.switchNUM
+            };
+            sArray.push_back(incomingSwitch);
             break;
         }
     case ASK:  // compose ADD_PACK
