@@ -314,20 +314,6 @@ int openfifoWrite(string name) {
     return fd;
 }
 // KEYBOARD ----------------------------------------------------------------
-void parseKeyboardMaster(const char * keyboardInput, vector<SWITCH>&sArray) {
-    // print stuff/
-    if (strcmp(keyboardInput, "info") == 0) {
-        assert(sArray.size() >= 1); // assert at least one switch exist
-        printInfoMaster(sArray);
-    } 
-}
-void parseKeyboardSwitch(const char* keyboardInput, vector<fTABLEROW>&ftable) {
-    if (strcmp(keyboardInput, "info") == 0) {
-        assert(ftable.size() > 0);
-        printInfoSwitch(ftable);
-    }
-}
-
 void printInfoMaster(vector<SWITCH>&sArray) {
     // mode == master or switch
     assert(sArray.size() > 0);
@@ -348,6 +334,19 @@ void printInfoSwitch(vector<fTABLEROW>&forwardTable) {
         forwardTable[i].destIP_hi, ACTIONNAME[forwardTable[i].ACTIONTYPE], forwardTable[i].actionVAL, 
         forwardTable[i].pktCount);
    } 
+}
+void parseKeyboardSwitch(const char* keyboardInput, vector<fTABLEROW>&ftable) {
+    if (strcmp(keyboardInput, "info") == 0) {
+        assert(ftable.size() > 0);
+        printInfoSwitch(ftable);
+    }
+}
+void parseKeyboardMaster(const char * keyboardInput, vector<SWITCH>&sArray) {
+    // print stuff/
+    if (strcmp(keyboardInput, "info") == 0) {
+        assert(sArray.size() >= 1); // assert at least one switch exist
+        printInfoMaster(sArray);
+    } 
 }
 // --------------------------------------------------------------------------------
 void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERSWITCH * master) {
