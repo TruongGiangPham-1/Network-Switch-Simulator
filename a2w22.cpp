@@ -314,14 +314,23 @@ int openfifoWrite(string name) {
     return fd;
 }
 // KEYBOARD ----------------------------------------------------------------
-void parseKeyboard(const char * keyboardInput) {
+void parseKeyboardMaster(const char * keyboardInput, vector<SWITCH>&sArray) {
     // print stuff/
     if (strcmp(keyboardInput, "info") == 0) {
-
+        assert(sArray.size() >= 1); // assert at least one switch exist
+        printInfoMaster(sArray);
+    } 
+}
+void parseKeyboardSwitch(const char* keyboardInput, vector<fTABLEROW>&ftable) {
+    if (strcmp(keyboardInput, "info") == 0) {
+        assert(ftable.size() > 0);
+        printInfoSwitch(ftable);
     }
 }
+
 void printInfoMaster(vector<SWITCH>&sArray) {
     // mode == master or switch
+    assert(sArray.size() > 0);
     for (int i = 0; i < sArray.size(); i++) {
         string port3 = to_string(sArray[i].lowIP) + "-" + to_string(sArray[i].highIP);
         printf("Switch information:\n");
@@ -331,10 +340,10 @@ void printInfoMaster(vector<SWITCH>&sArray) {
     return;
 }
 void printInfoSwitch(vector<fTABLEROW>&forwardTable) {
-   for (int i = 0; i < forwardTable.size(); i++) {
-
+    assert(forwardTable.size() > 0);
+    for (int i = 0; i < forwardTable.size(); i++) {
        // I realized i can just do %d-%d instead of above
-       printf("[%d] (scrIP= %d-%d, destIP= %d-%d, action=%s:%d, pktCount= %d",
+        printf("[%d] (scrIP= %d-%d, destIP= %d-%d, action=%s:%d, pktCount= %d",
         i, forwardTable[i].scrIP_lo, forwardTable[i].scrIP_hi, forwardTable[i].destIP_lo, 
         forwardTable[i].destIP_hi, ACTIONNAME[forwardTable[i].ACTIONTYPE], forwardTable[i].actionVAL, 
         forwardTable[i].pktCount);
