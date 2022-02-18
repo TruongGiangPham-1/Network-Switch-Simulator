@@ -58,6 +58,8 @@ typedef struct {
     int Nneighbor;
     int lowIP;
     int highIP;
+    int pswj;
+    int pswk;
 } HELLO_PACK;
 
 typedef struct {
@@ -113,7 +115,7 @@ void WARNING (const char *fmt, ... )
 
 
 // ------------------------------
-MSG composeHELLOmsg (int switchID, int nNeighbor, int lowIP, int highIP)
+MSG composeHELLOmsg (int switchID, int nNeighbor, int lowIP, int highIP, int pswj, int pswk)
 {
     MSG  msg;
     memset( (char *) &msg, 0, sizeof(msg) );
@@ -122,6 +124,8 @@ MSG composeHELLOmsg (int switchID, int nNeighbor, int lowIP, int highIP)
     msg.pHello.Nneighbor = nNeighbor;
     msg.pHello.lowIP = lowIP;
     msg.pHello.highIP = highIP;
+    msg.pHello.pswj = pswj;
+    msg.pHello.pswk = pswk;
     return msg;
 }    
 // ------------------------------    
@@ -321,11 +325,11 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
             msg = composeACKmsg();
             sendFrame(fd, HELLO_ACK, &msg);
             SWITCH incomingSwitch = {
-                .highIP = (frame->msg).pHello.highIP,
-                .lowIP = (frame->msg).pHello.lowIP,
-                .pswj = 0,
-                .pswk = 0,
-                .switchID = (frame->msg).pHello.switchNUM
+                /*.highIP =*/ (frame->msg).pHello.highIP,
+                /*.lowIP = */(frame->msg).pHello.lowIP,
+                /*.pswj = */ (frame->msg).pHello.pswj,
+                /*.pswk =*/ (frame->msg).pHello.pswk,
+                /*.switchID = */ (frame->msg).pHello.switchNUM
             };
             sArray.push_back(incomingSwitch);
             break;
@@ -403,7 +407,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
                 if (pollfds[i].fd == -1) continue; // other end closed pipe so rcvFrame() changed fd to -1
                 printFrame("recieved ", &frame); 
-                parseAndSendToSwitch(fds[0][i], &frame, sArray);
+                parseAndSendToSwitch(fds[0][i], &frame, sArray, masterswitch);
                 pollfds[i].revents = 0;
             }
         }
@@ -448,7 +452,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     //write(fds[pSwitch->switchID][0], writebuff, MAXWORD);
     FRAME frame;
     MSG msg;
-    msg = composeHELLOmsg(pSwitch->switchID, 0, pSwitch->lowIP, pSwitch->highIP);
+    msg = composeHELLOmsg(pSwitch->switchID, 0, pSwitch->lowIP, pSwitch->highIP, pSwitch->pswj, pSwitch->pswk);
     sendFrame(fds[pSwitch->switchID][0], HELLO, &msg);
     while (true) {
         // todo; send HELLO and receive HELLO_ACK
