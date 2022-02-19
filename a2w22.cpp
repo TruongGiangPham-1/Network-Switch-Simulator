@@ -326,11 +326,12 @@ int openfifoWrite(string name) {
 void printInfoMaster(vector<SWITCH>&sArray) {
     // mode == master or switch
     assert(sArray.size() > 0);
+    //printf("sArrap[0].highIP == %d\n", sArray[0].highIP); == -1 for somereason
     printf("Switch information:\n");
     for (int i = 0; i < sArray.size(); i++) {
-        string port3 = to_string(sArray[i].lowIP) + "-" + to_string(sArray[i].highIP);
-        printf("[psw %d] port1= %d, port2= %d, port3= %s\n", 
-            sArray[i].switchID, sArray[i].pswj, sArray[i].pswk, port3.c_str());
+        //string port3 = to_string(sArray[i].lowIP) + "-" + to_string(sArray[i].highIP);
+        printf("[psw %d] port1= %d, port2= %d, port3= %d-%d\n", 
+            sArray[i].switchID, sArray[i].pswj, sArray[i].pswk, sArray[i].lowIP, sArray[i].highIP);
     }
     return;
 }
@@ -390,12 +391,13 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
             msg = composeACKmsg();
             sendFrame(fd, HELLO_ACK, &msg);
             SWITCH incomingSwitch = {
-                /*.highIP =*/ (frame->msg).pHello.highIP,
+                /*.switchID = */ (frame->msg).pHello.switchNUM,
                 /*.lowIP = */(frame->msg).pHello.lowIP,
+                /*.highIP =*/ (frame->msg).pHello.highIP,
                 /*.pswj = */ (frame->msg).pHello.pswj,
                 /*.pswk =*/ (frame->msg).pHello.pswk,
-                /*.switchID = */ (frame->msg).pHello.switchNUM
             };
+            //printf("[adding switch] switchID[%d], highIP[%d]", (frame->msg).pHello.switchNUM, (frame->msg).pHello.highIP);
             sArray.push_back(incomingSwitch);
             break;
         }
@@ -477,6 +479,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
                 if (pollfds[i].fd == -1) continue; // other end closed pipe so rcvFrame() changed fd to -1
                 printFrame("recieved ", &frame); 
                 parseAndSendToSwitch(fds[0][i], &frame, sArray, masterswitch, nullptr);
+                
                 pollfds[i].revents = 0;
             }
         }
