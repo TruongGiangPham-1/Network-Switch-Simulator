@@ -458,6 +458,13 @@ void parseSwitchMSG(int fd, FRAME * frame, vector<fTABLEROW>&forwardTable) {
         break;
     }
 }
+int parseFileLine(char * readbuf) {
+    // ignore line with comment
+    printf("parsing input: [%s]\n", readbuf);
+    if (readbuf[0] == '#') {
+        return 0;
+    } 
+}
 // MASTER LOOP
 void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     char readbuff[MAXWORD];
@@ -558,6 +565,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     assert(ackowledge == 1); // assert its ackolowdged
     // open DATAFILE
     FILE *fp;
+    char* result;
     string datafileSTR = "./" + string(datafile);
     fp = fopen(datafileSTR.c_str(), "r");
     if (fp == NULL) {
@@ -576,7 +584,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         // poll port3
         memset(readbuff, 0, MAXLINE);
         if(fgets(readbuff, MAXLINE, (FILE*) fp) != NULL) {
-
+            //parseFileLine();
         } else {
             printf("EOF REACHED\n");
         }
