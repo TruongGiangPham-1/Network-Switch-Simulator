@@ -27,13 +27,14 @@ void printKind(KIND kind) {
 }
 
 int main() {
-    printKind(HELLO);
-    printKind(HELLO_ACK);
-    printKind(ASK);
-    printKind(ADD);
-    printKind(RELAY);
-
-    int MSG;
-
+//    printKind(HELLO);
+//    printKind(HELLO_ACK);
+//    printKind(ASK);
+//    printKind(ADD);
+//    printKind(RELAY);
+//
+    const char* m = "datafile";
+    string str = "./" + string(m);
+    cout << str << endl;
     return 0;
 }

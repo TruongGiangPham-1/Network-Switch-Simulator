@@ -191,7 +191,7 @@ void printFrame (const char *prefix, FRAME *frame)
 {
     // prefix = "received"
     MSG  msg= frame->msg;
-    printf("%s [%s] \n", prefix, KINDNAME[frame->kind]);
+    //printf("%s [%s] \n", prefix, KINDNAME[frame->kind]);
     switch (frame->kind)
     {
     case HELLO/* constant-expression */:
@@ -378,7 +378,7 @@ int getACK(pollfd * pollfds) {  // poll master until i get acknowledge
     }
     return 0;
 }
-
+// ----------------------------------------------------------------------------------
 void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERSWITCH * master, SWITCH * sw) {
     // parse Frame and send to fd // 
     MSG msg;
@@ -429,6 +429,32 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
         }
     default:
         printf("default\n");
+        break;
+    }
+}
+void parseSwitchMSG(int fd, FRAME * frame, vector<fTABLEROW>&forwardTable) {
+    MSG msg;
+    msg = frame->msg;
+    switch (frame->kind)
+    {
+    case ADD:
+        {
+            // add to forwarding table
+            fTABLEROW rule = {
+                /* scrIP_lo*/ 0,
+                /* scrIP_hi */1000,
+                /* destIP_lo*/ msg.pAdd.destIP_lo,
+                /* destIP_hi*/ msg.pAdd.destIP_hi,
+                /* actiontype*/msg.pAdd.ACTIONTYPE,
+                /* actionVal*/ msg.pAdd.actionVAL,
+                /* pktCount */ 0
+            };
+            forwardTable.push_back(rule);
+            // apply header to new rule
+            break;
+        }
+    
+    default:
         break;
     }
 }
@@ -486,7 +512,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
     }
 }
 // pSwitch loop
-void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
+void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const char* datafile) {
     // establish connection with master/pswj/pswk
     string fifo_i_master = getfifoName(pSwitch -> switchID, 0);
     string fifo_master_i = getfifoName(0, pSwitch->switchID);  // READ
@@ -518,20 +544,27 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     pollfds[2].fd = -1;
     pollfds[3].fd = -1;
     pollfds[4].fd = -1;
-    char readbuff[MAXWORD];
+    char readbuff[MAXLINE];
     char writebuff[MAXWORD];
     //memset(writebuff, 0, MAXWORD);
     //strcpy(writebuff, "HELLO");
     //write(fds[pSwitch->switchID][0], writebuff, MAXWORD);
+    vector<fTABLEROW> forwardTable;
     FRAME frame;
     MSG msg;
     msg = composeHELLOmsg(pSwitch->switchID, 0, pSwitch->lowIP, pSwitch->highIP, pSwitch->pswj, pSwitch->pswk);
     sendFrame(fds[pSwitch->switchID][0], HELLO, &msg);
     int ackowledge = getACK(pollfds);
     assert(ackowledge == 1); // assert its ackolowdged
-
-    msg = composeASKmsg(200, 300, pSwitch->switchID);
-    sendFrame(fds[pSwitch->switchID][0], ASK, &msg);
+    // open DATAFILE
+    FILE *fp;
+    string datafileSTR = "./" + string(datafile);
+    fp = fopen(datafileSTR.c_str(), "r");
+    if (fp == NULL) {
+        perror("fopen FAILED: ");
+    }
+    //msg = composeASKmsg(200, 300, pSwitch->switchID);
+    //sendFrame(fds[pSwitch->switchID][0], ASK, &msg);
     while (true) {
         // todo; send HELLO and receive HELLO_ACK
         int pollret = poll(pollfds, SWITCHPORTS_N, 1);
@@ -540,15 +573,18 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
             exit(EXIT_FAILURE);
         }
         // poll keyboard
-        // send HELLO
-        for (int i = 0; i < SWITCHPORTS_N - 1; i++) {  // check everything exept keyboard[0 - 3]
+        // poll port3
+        memset(readbuff, 0, MAXLINE);
+        fgets(readbuff, MAXLINE, (FILE*) fp); 
+        for (int i = 0; i < SWITCHPORTS_N - 2; i++) {  // check everything exept keyboard[0 - 3] and port 3
             if (pollfds[i].revents and POLLIN) {
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
                 if (pollfds[i].fd == -1) continue; //closed
                 printFrame("recieved ", &frame);  
+                   
+                
             }
         }
-
     } 
 }
 // ----------------------------------------------------------------------------------
@@ -585,7 +621,7 @@ int main(int argc, char *argv[]) {
         }
         populateSwitch(&pSwitch, tokens);
         //printSwitch(&pSwitch);  
-        do_switch(&pSwitch, fds);
+        do_switch(&pSwitch, fds, tokens[1]);
     } else {
         printf("invalid arguments\n");
         return 0;
