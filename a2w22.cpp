@@ -575,7 +575,13 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         // poll keyboard
         // poll port3
         memset(readbuff, 0, MAXLINE);
-        fgets(readbuff, MAXLINE, (FILE*) fp); 
+        if(fgets(readbuff, MAXLINE, (FILE*) fp) != NULL) {
+
+        } else {
+            printf("EOF REACHED\n");
+        }
+
+
         for (int i = 0; i < SWITCHPORTS_N - 2; i++) {  // check everything exept keyboard[0 - 3] and port 3
             if (pollfds[i].revents and POLLIN) {
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
