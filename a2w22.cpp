@@ -200,8 +200,17 @@ void printFrame (const char *prefix, FRAME *frame)
                msg.pHello.lowIP, msg.pHello.highIP);
         break;
     case HELLO_ACK:
-        
+        printf("ACKED\n");
         break;
+    case ASK:
+    {
+        printf("[ASK]: header= (srcIP= %d, destIP=%d)\n", msg.pAsk.scrIP, msg.pAsk.destIP);
+    }
+    case ADD:
+    {
+        printf("[ADD]: (srcIP-0-1000, destIP=%d-%d, action=%s:%d, pktCount= 0\n", 
+        msg.pAdd.destIP_lo, msg.pAdd.destIP_hi, ACTIONNAME[msg.pAdd.ACTIONTYPE], msg.pAdd.actionVAL);
+    }
     default:
         break;
     }
@@ -317,10 +326,10 @@ int openfifoWrite(string name) {
 void printInfoMaster(vector<SWITCH>&sArray) {
     // mode == master or switch
     assert(sArray.size() > 0);
+    printf("Switch information:\n");
     for (int i = 0; i < sArray.size(); i++) {
         string port3 = to_string(sArray[i].lowIP) + "-" + to_string(sArray[i].highIP);
-        printf("Switch information:\n");
-        printf("[psw %d] port1= %d, port2= %d, port3= %s", 
+        printf("[psw %d] port1= %d, port2= %d, port3= %s\n", 
             sArray[i].switchID, sArray[i].pswj, sArray[i].pswk, port3.c_str());
     }
     return;
@@ -329,7 +338,7 @@ void printInfoSwitch(vector<fTABLEROW>&forwardTable) {
     assert(forwardTable.size() > 0);
     for (int i = 0; i < forwardTable.size(); i++) {
        // I realized i can just do %d-%d instead of above
-        printf("[%d] (scrIP= %d-%d, destIP= %d-%d, action=%s:%d, pktCount= %d",
+        printf("[%d] (scrIP= %d-%d, destIP= %d-%d, action=%s:%d, pktCount= %d\n",
         i, forwardTable[i].scrIP_lo, forwardTable[i].scrIP_hi, forwardTable[i].destIP_lo, 
         forwardTable[i].destIP_hi, ACTIONNAME[forwardTable[i].ACTIONTYPE], forwardTable[i].actionVAL, 
         forwardTable[i].pktCount);
@@ -459,7 +468,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
             memset(readbuff, 0, MAXWORD);
             int bytesread = read(pollfds[0].fd, readbuff, MAXWORD); // theres a \n character
             readbuff[strlen(readbuff) - 1] = '\0';  // clear \n character
-            //printf("received: %s\n", readbuff);
+            parseKeyboardMaster(readbuff, sArray);
         }
         for (int i = 1; i < nswitch_ + 1; i++) {
             if (pollfds[i].revents and POLLIN) {
