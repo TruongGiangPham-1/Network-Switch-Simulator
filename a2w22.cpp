@@ -148,6 +148,14 @@ MSG  composeADDmsg (int dest_lo, int dest_hi, tableACTION action, int actionVAL)
    
     return msg;
 }
+MSG composeASKmsg(int scrIP, int destIP, int switchID) {
+    MSG msg;
+    msg.pAsk.scrIP = scrIP;
+    msg.pAsk.destIP = destIP;
+    msg.pAsk.switchID = switchID;
+    return msg; 
+
+}
 // ----------------------------
 void sendFrame (int fd, KIND kind, MSG *msg)
 {
@@ -487,12 +495,13 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     pollfds[4].fd = -1;
     char readbuff[MAXWORD];
     char writebuff[MAXWORD];
-    memset(writebuff, 0, MAXWORD);
-    strcpy(writebuff, "HELLO");
+    //memset(writebuff, 0, MAXWORD);
+    //strcpy(writebuff, "HELLO");
     //write(fds[pSwitch->switchID][0], writebuff, MAXWORD);
     FRAME frame;
     MSG msg;
     msg = composeHELLOmsg(pSwitch->switchID, 0, pSwitch->lowIP, pSwitch->highIP, pSwitch->pswj, pSwitch->pswk);
+    
     sendFrame(fds[pSwitch->switchID][0], HELLO, &msg);
     while (true) {
         // todo; send HELLO and receive HELLO_ACK
