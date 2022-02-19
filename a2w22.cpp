@@ -514,10 +514,12 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     FRAME frame;
     MSG msg;
     msg = composeHELLOmsg(pSwitch->switchID, 0, pSwitch->lowIP, pSwitch->highIP, pSwitch->pswj, pSwitch->pswk);
-    //msg = composeASKmsg(100, 150, pSwitch->switchID);
     sendFrame(fds[pSwitch->switchID][0], HELLO, &msg);
     int ackowledge = getACK(pollfds);
     assert(ackowledge == 1); // assert its ackolowdged
+
+    msg = composeASKmsg(200, 300, pSwitch->switchID);
+    sendFrame(fds[pSwitch->switchID][0], ASK, &msg);
     while (true) {
         // todo; send HELLO and receive HELLO_ACK
         int pollret = poll(pollfds, SWITCHPORTS_N, 1);
@@ -531,7 +533,6 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
             if (pollfds[i].revents and POLLIN) {
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
                 if (pollfds[i].fd == -1) continue; //closed
-
                 printFrame("recieved ", &frame);  
             }
         }
