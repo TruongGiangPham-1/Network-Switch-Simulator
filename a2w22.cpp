@@ -286,14 +286,6 @@ void populateMaster(MASTERSWITCH * master, char token[][MAXWORD]) {
     master->helloCount = 0;
 }
 
-void doMasterPolling() {
-
-}
-// UPDATE fds incase more switch wants to connect
-void updateFDs() {
-    
-}
-
 string getfifoName(int x, int y) {
     string name = "fifo-" + to_string(x) + "-" + to_string(y);
     return name;
@@ -357,6 +349,26 @@ void parseKeyboardMaster(const char * keyboardInput, vector<SWITCH>&sArray) {
     } 
 }
 // --------------------------------------------------------------------------------
+int getACK(pollfd * pollfds) {  // poll master until i get acknowledge
+    FRAME frame;
+    while (true) {
+        int pollret = poll(pollfds, SWITCHPORTS_N, 1);
+        if (pollret < 0) {
+            cerr << "pollret returned -1" << endl;
+            exit(EXIT_FAILURE);
+        }
+        if (pollfds[0].revents and POLLIN) { // poll form master
+            frame = rcvFrame(pollfds[0].fd, pollfds, 0);
+            if (pollfds[0].fd == -1) return 0; //master closed
+            if (frame.kind == HELLO_ACK) {
+                printFrame("recived ACK ", &frame);
+                return 1;
+            }   
+        }
+    }
+    return 0;
+}
+
 void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERSWITCH * master, SWITCH * sw) {
     // parse Frame and send to fd // 
     MSG msg;
@@ -486,7 +498,8 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     fds[pSwitch->switchID][0] = openfifoWrite(fifo_i_master);
 
     pollfd pollfds[SWITCHPORTS_N]; // = 5
-    //pollfds[0] = fifo-0-i; pollfds[1]... ..pollfds[4] = keyboard
+    //pollfds[0] = fifo-0-i/master to pswi; pollfds[1]=port1l pollfds[2]=port2, pollfds[4] = keyboard
+
     pollfds[0].fd = fds[0][pSwitch->switchID];
     pollfds[0].events = POLLIN; 
     pollfds[1].fd = -1;
@@ -501,8 +514,10 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     FRAME frame;
     MSG msg;
     msg = composeHELLOmsg(pSwitch->switchID, 0, pSwitch->lowIP, pSwitch->highIP, pSwitch->pswj, pSwitch->pswk);
-    
+    //msg = composeASKmsg(100, 150, pSwitch->switchID);
     sendFrame(fds[pSwitch->switchID][0], HELLO, &msg);
+    int ackowledge = getACK(pollfds);
+    assert(ackowledge == 1); // assert its ackolowdged
     while (true) {
         // todo; send HELLO and receive HELLO_ACK
         int pollret = poll(pollfds, SWITCHPORTS_N, 1);
@@ -516,11 +531,11 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
             if (pollfds[i].revents and POLLIN) {
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
                 if (pollfds[i].fd == -1) continue; //closed
-                if (frame.kind == HELLO_ACK) {
-                    printFrame("received ACK: ", &frame);
-                }
+
+                printFrame("recieved ", &frame);  
             }
-        } 
+        }
+
     } 
 }
 // ----------------------------------------------------------------------------------
