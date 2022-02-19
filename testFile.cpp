@@ -46,9 +46,11 @@ void parseFileLine(char* readbuff, int switchID) {
         tokens.push_back(tok);
     }
     //printf("tokens[0][0] = [%c]\n", tokens[0][0]);
-    if (tokens[0][3] == switchID_char) {
+    if (tokens[0][3] == switchID_char and tokens[1] != "delay") {  // process delay last
         // we want this line
         printf("%s,%s,%s\n", tokens[0].c_str(), tokens[1].c_str(), tokens[2].c_str());
+        //1. 
+        //if (tokens[0] )
     }
 
 }
@@ -73,7 +75,7 @@ int main() {
     while (fgets(readbuff, MAXLINE, (FILE*)fp) != NULL) {
         readbuff[strlen(readbuff) - 1] = '\0';
         //printf("line:[%s]\n", readbuff);
-        parseFileLine(readbuff, 3);
+        parseFileLine(readbuff, 1);
         memset(readbuff, 0, MAXLINE);
     }
     printf("printing eof: [%s]\n", readbuff);
