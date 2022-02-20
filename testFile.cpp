@@ -53,7 +53,7 @@ void parseFileLine(char* readbuff, int switchID) {
     //printf("tokens[0][0] = [%c]\n", tokens[0][0]);
     if (tokens[0][3] == switchID_char and tokens[1] != "delay") {  // process delay last
         // we want this line
-        printf("%s,%s,%s\n", tokens[0].c_str(), tokens[1].c_str(), tokens[2].c_str());
+        //printf("%s,%s,%s\n", tokens[0].c_str(), tokens[1].c_str(), tokens[2].c_str());
         //1. check the rule table 
         // 2. if dont exist, we send ASK. 
         //if (tokens[0])

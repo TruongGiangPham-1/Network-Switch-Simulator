@@ -191,7 +191,7 @@ void printFrame (const char *prefix, FRAME *frame)
 {
     // prefix = "received"
     MSG  msg= frame->msg;
-    //printf("%s [%s] \n", prefix, KINDNAME[frame->kind]);
+    printf("%s [%s] ", prefix, KINDNAME[frame->kind]);
     switch (frame->kind)
     {
     case HELLO/* constant-expression */:
@@ -432,7 +432,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
         break;
     }
 }
-void parseSwitchMSG(int fd, FRAME * frame, vector<fTABLEROW>&forwardTable) {
+void parseSwitchMSG(int fd, FRAME * frame, vector<fTABLEROW>&forwardTable, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     MSG msg;
     msg = frame->msg;
     switch (frame->kind)
@@ -451,6 +451,14 @@ void parseSwitchMSG(int fd, FRAME * frame, vector<fTABLEROW>&forwardTable) {
             };
             forwardTable.push_back(rule);
             // apply header to new rule
+            if (rule.ACTIONTYPE == DROP) {
+                forwardTable[forwardTable.size() - 1].pktCount += 1;
+            } else if (rule.ACTIONTYPE == FORWARD) {
+                // relay to port, pipe fds[i][i + 1] if port 2
+                // relay to pipe fds[i][i - 1] if port 1
+                
+
+            }
             break;
         }
     
@@ -458,6 +466,7 @@ void parseSwitchMSG(int fd, FRAME * frame, vector<fTABLEROW>&forwardTable) {
         break;
     }
 }
+// --------------------------------------------------------------------------------------
 int parseFileLine(char * readbuf) {
     // ignore line with comment
     printf("parsing input: [%s]\n", readbuf);
@@ -573,7 +582,19 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     }
     //msg = composeASKmsg(200, 300, pSwitch->switchID);
     //sendFrame(fds[pSwitch->switchID][0], ASK, &msg);
+    bool EOFreached = false;
+    bool ADDreceived = true;
     while (true) {
+        memset(readbuff, 0, MAXLINE);
+        if (ADDreceived) { // only read more line ADD received
+            if(fgets(readbuff, MAXLINE, (FILE*) fp) != NULL) {
+                //parseFileLine();
+                ADDreceived = false;
+            } else {
+                printf("EOF REACHED\n");
+                EOFreached = true;
+            }
+        }
         // todo; send HELLO and receive HELLO_ACK
         int pollret = poll(pollfds, SWITCHPORTS_N, 1);
         if (pollret < 0) {
@@ -582,12 +603,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         }
         // poll keyboard
         // poll port3
-        memset(readbuff, 0, MAXLINE);
-        if(fgets(readbuff, MAXLINE, (FILE*) fp) != NULL) {
-            //parseFileLine();
-        } else {
-            printf("EOF REACHED\n");
-        }
+
 
 
         for (int i = 0; i < SWITCHPORTS_N - 2; i++) {  // check everything exept keyboard[0 - 3] and port 3
@@ -595,7 +611,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
                 if (pollfds[i].fd == -1) continue; //closed
                 printFrame("recieved ", &frame);  
-                   
+                parseSwitchMSG(pollfds[i].fd, &frame, forwardTable, fds);
                 
             }
         }
