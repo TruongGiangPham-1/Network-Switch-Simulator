@@ -478,17 +478,30 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
                 // relay to pipe fds[i][i - 1] if port 1
                 // composeRelayMSg 
                 if (rule.actionVAL == 1) {
+                    assert(fds[currSwitchID][currSwitchID + 1] > 0);
                     sendmsg = composeRELAYmsg(frame);
                     sendFrame(fds[currSwitchID][currSwitchID + 1], RELAY, &sendmsg);
                 } else if (rule.actionVAL == 2) {
+                    assert(fds[currSwitchID][currSwitchID - 1] > 0);
                     sendmsg = composeRELAYmsg(frame);
                     sendFrame(fds[currSwitchID][currSwitchID - 1], RELAY, &sendmsg);
                 }
-
+                forwardTable[forwardTable.size() - 1].pktCount += 1;
             }
             break;
         }
-    
+    case RELAY:
+    {
+        if (msg.pRelay.destSwitchID == currSwitchID) {
+            // this is the switch that we can add rule to.
+            for (int i = 0; i < forwardTable.size(); i++) {
+                if (msg.pRelay.destIP >= forwardTable[i].destIP_lo and msg.pRelay.destIP <= forwardTable[i].destIP_hi) {
+                    forwardTable[i].pktCount += 1;
+                    return;
+                }
+            } 
+        } // else we relay to whichever port of this switch TODO
+    } 
     default:
         break;
     }
