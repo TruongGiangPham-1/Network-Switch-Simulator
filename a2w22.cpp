@@ -349,6 +349,7 @@ void printInfoMaster(vector<SWITCH>&sArray) {
 }
 void printInfoSwitch(vector<fTABLEROW>&forwardTable) {
     assert(forwardTable.size() > 0);
+    printf("Forwarding table: \n");
     for (int i = 0; i < forwardTable.size(); i++) {
        // I realized i can just do %d-%d instead of above
         printf("[%d] (scrIP= %d-%d, destIP= %d-%d, action=%s:%d, pktCount= %d\n",
@@ -360,7 +361,7 @@ void printInfoSwitch(vector<fTABLEROW>&forwardTable) {
 void parseKeyboardSwitch(const char* keyboardInput, vector<fTABLEROW>&ftable) {
     if (strcmp(keyboardInput, "info") == 0) {
         assert(ftable.size() > 0);
-        printf("reached parseKEyboarSwitch\n");
+        //printf("reached parseKEyboarSwitch\n");
         printInfoSwitch(ftable);
     }
 }
@@ -510,11 +511,11 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
 // --------------------------------------------------------------------------------------
 int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, int fds[8][8]) {
     if (readbuff[0] == '#') {
-        printf("# so skipp\n");
+        //printf("# so skipp\n");
         return 0;
     }
     if (readbuff[0] == '\0') {
-        printf("emptyline, skipping\n");
+        //printf("emptyline, skipping\n");
         return 0;
     }
     vector<string>tokens;

@@ -21,7 +21,13 @@ using namespace std;
 typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
 
 char KINDNAME[][MAXWORD]= { "HELLO", "HELLO_ACK", "ASK", "ADD", "RELAY" };
-
+typedef struct {
+    int one;
+    int two;
+    int three;
+    int four;
+    int five;
+} SWITCH;
 void printKind(KIND kind) {
     printf("recieved %s\n", KINDNAME[kind]);
 }
@@ -33,8 +39,15 @@ int main() {
 //    printKind(ADD);
 //    printKind(RELAY);
 //
-    const char* m = "datafile";
-    string str = "./" + string(m);
-    cout << str << endl;
+    //const char* m = "datafile";
+    //string str = "./" + string(m);
+    //cout << str << endl;
+    SWITCH s1 = {
+        1,
+        3,
+        4
+    };
+    printf("%d, %d, %d, %d, %d\n", s1.one, s1.two, s1.three, s1.four, s1.five);
+    
     return 0;
 }
