@@ -41,6 +41,13 @@ typedef struct {
     int highIP;
     int pswj;
     int pswk;
+    int nACKreceived;
+    int nADDreceived;
+    int nRELAYIN;
+    int nHELLOtransm;
+    int nASKtrans;
+    int nRelayout;
+    int admit; // admit in forwardtable
 } SWITCH;
 
 typedef struct {
@@ -290,6 +297,13 @@ void populateSwitch(SWITCH * pSwitch, char tokens[][MAXWORD]) {
     PII ipPair = getLowIP_HighIP(tokens[4]);
     pSwitch -> lowIP = ipPair.first;
     pSwitch -> highIP = ipPair.second;
+    pSwitch->nACKreceived = 0;
+    pSwitch->nADDreceived = 0;
+    pSwitch->nASKtrans = 0;
+    pSwitch->nHELLOtransm = 0;
+    pSwitch->nRELAYIN = 0;
+    pSwitch->nRelayout = 0;
+    pSwitch->admit = 0;
 
 }
 
@@ -347,7 +361,7 @@ void printInfoMaster(vector<SWITCH>&sArray) {
     }
     return;
 }
-void printInfoSwitch(vector<fTABLEROW>&forwardTable) {
+void printInfoSwitch(vector<fTABLEROW>&forwardTable, SWITCH * sw) {
     assert(forwardTable.size() > 0);
     printf("Forwarding table: \n");
     for (int i = 0; i < forwardTable.size(); i++) {
@@ -356,13 +370,19 @@ void printInfoSwitch(vector<fTABLEROW>&forwardTable) {
         i, forwardTable[i].scrIP_lo, forwardTable[i].scrIP_hi, forwardTable[i].destIP_lo, 
         forwardTable[i].destIP_hi, ACTIONNAME[forwardTable[i].ACTIONTYPE], forwardTable[i].actionVAL, 
         forwardTable[i].pktCount);
-   } 
+    }
+    printf("\n");
+    printf("Packet Stats:\n");
+    printf("Received: ADMIT: %d, HELLO_ACK: %d, ADD: %d, RELAYIN: %d\n", 
+    sw->admit, sw->nACKreceived, sw->nADDreceived, sw->nRELAYIN);
+    printf("Transmitted: HELLO: %d, ASK: %d, RELAYIN: %d\n", 
+    sw->nHELLOtransm, sw->nASKtrans, sw->nRelayout); 
 }
-void parseKeyboardSwitch(const char* keyboardInput, vector<fTABLEROW>&ftable) {
+void parseKeyboardSwitch(const char* keyboardInput, vector<fTABLEROW>&ftable, SWITCH *sw) {
     if (strcmp(keyboardInput, "info") == 0) {
         assert(ftable.size() > 0);
         //printf("reached parseKEyboarSwitch\n");
-        printInfoSwitch(ftable);
+        printInfoSwitch(ftable, sw);
     }
 }
 void parseKeyboardMaster(const char * keyboardInput, vector<SWITCH>&sArray) {
@@ -453,7 +473,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
         break;
     }
 }
-void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTable, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
+void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTable, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], SWITCH * pSwitch) {
     MSG msg;
     msg = frame->msg;
     MSG sendmsg;
@@ -462,6 +482,7 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
     case ADD:
         {
             // add to forwarding table
+            (pSwitch->nADDreceived) += 1;
             fTABLEROW rule = {
                 /* scrIP_lo*/ 0,
                 /* scrIP_hi */1000,
@@ -503,13 +524,14 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
                 }
             } 
         } // else we relay to whichever port of this switch TODO
+        (pSwitch->nRELAYIN) += 1;
     } 
     default:
         break;
     }
 }
 // --------------------------------------------------------------------------------------
-int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, int fds[8][8]) {
+int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, int fds[8][8], SWITCH*pswitch) {
     if (readbuff[0] == '#') {
         //printf("# so skipp\n");
         return 0;
@@ -534,6 +556,7 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
     }
     //printf("tokens[0][0] = [%c]\n", tokens[0][0]);
     if (tokens[0][3] == switchID_char and tokens[1] != "delay") {  // process delay last
+        pswitch->admit += 1;
         // we want this line
         //printf("%s,%s,%s\n", tokens[0].c_str(), tokens[1].c_str(), tokens[2].c_str());
         //1. check the rule table 
@@ -549,7 +572,8 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
             // assumes that lowip is within range
             if (forwardTable[i].destIP_lo <= destIP and destIP <= forwardTable[i].destIP_hi) {
                 forwardTable[i].pktCount += 1;
-                return 0;
+
+                return 2;
             } 
         }
         // send ask
@@ -670,6 +694,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     sendFrame(fds[pSwitch->switchID][0], HELLO, &msg);
     int ackowledge = getACK(pollfds);
     assert(ackowledge == 1); // assert its ackolowdged
+    pSwitch->nACKreceived += 1;
     // open DATAFILE
     FILE *fp;
     char* result;
@@ -686,10 +711,11 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         memset(readbuff, 0, MAXLINE);
         if (ADDreceived) { // only read more line ADD received
             if(fgets(readbuff, MAXLINE, (FILE*) fp) != NULL) {
-                int ret = parseFileLine(readbuff, pSwitch->switchID, forwardTable, fds);
+                int ret = parseFileLine(readbuff, pSwitch->switchID, forwardTable, fds, pSwitch);
                 if (ret == 1) {  // means that we sent ASK
                     ADDreceived = false;
-                }
+                    pSwitch->nASKtrans += 1;
+                } 
             } else {
                 printf("EOF REACHED\n");
                 EOFreached = true;
@@ -708,7 +734,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
             int bytesread = read(pollfds[4].fd, keyboardbuff, MAXLINE);
             keyboardbuff[strlen(keyboardbuff) - 1] = '\0';
             assert(bytesread > 0);
-            parseKeyboardSwitch(keyboardbuff, forwardTable);
+            parseKeyboardSwitch(keyboardbuff, forwardTable, pSwitch);
         } 
       
         for (int i = 0; i < SWITCHPORTS_N - 2; i++) {  // check everything exept keyboard[0 - 3] and port 3
@@ -717,7 +743,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
                 if (pollfds[i].fd == -1) continue; //closed
                 printFrame("recieved ", &frame);  
                 if (frame.kind == ADD) ADDreceived = true;
-                parseSwitchMSG(pSwitch->switchID, &frame, forwardTable, fds);
+                parseSwitchMSG(pSwitch->switchID, &frame, forwardTable, fds, pSwitch);
             }
         }
     } 
