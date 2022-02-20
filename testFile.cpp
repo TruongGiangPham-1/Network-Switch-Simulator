@@ -57,6 +57,9 @@ void parseFileLine(char* readbuff, int switchID) {
         //1. check the rule table 
         // 2. if dont exist, we send ASK. 
         //if (tokens[0])
+        int lowip = stoi(tokens[1]);
+        int highip = stoi(tokens[2]);
+        printf("lowip [%d], highIP [%d]\n", lowip, highip);
     }
 
 }

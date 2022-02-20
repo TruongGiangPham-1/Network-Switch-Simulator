@@ -507,13 +507,55 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
     }
 }
 // --------------------------------------------------------------------------------------
-int parseFileLine(char * readbuf) {
-    // ignore line with comment
-    printf("parsing input: [%s]\n", readbuf);
-    if (readbuf[0] == '#') {
-        return 0;
-    } 
-    return 1;
+void parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, int fds[8][8]) {
+    if (readbuff[0] == '#') {
+        printf("# so skipp\n");
+        return;
+    }
+    if (readbuff[0] == '\0') {
+        printf("emptyline, skipping\n");
+        return;
+    }
+    vector<string>tokens;
+    char readcopied[MAXLINE];
+    char * token = NULL, *theRest = NULL;
+    memset(readcopied, 0, MAXLINE);
+    strcpy(readcopied, readbuff);
+    char switchID_char = '0' + switchID;
+    //assert(switchID_char == '1');
+    //printf("swithcid char [%c]\n", switchID_char);
+    theRest = readcopied;
+    for (int i = 0; i < 3; i++) {
+        token = strtok_r(theRest, " ", &theRest);
+        string tok(token);
+        tokens.push_back(tok);
+    }
+    //printf("tokens[0][0] = [%c]\n", tokens[0][0]);
+    if (tokens[0][3] == switchID_char and tokens[1] != "delay") {  // process delay last
+        // we want this line
+        //printf("%s,%s,%s\n", tokens[0].c_str(), tokens[1].c_str(), tokens[2].c_str());
+        //1. check the rule table 
+        // 2. if dont exist, we send ASK. 
+        //if (tokens[0])
+        assert(forwardTable.size() > 0);
+        assert(forwardTable[0].actionVAL = 3);
+        assert(forwardTable[0].ACTIONTYPE = FORWARD);
+        int srcIP = stoi(tokens[1]);
+        int destIP = stoi(tokens[2]);
+        for (int i = 0; i < forwardTable.size(); i++) {
+            // assumes that lowip is within range
+            if (forwardTable[i].destIP_lo <= destIP and destIP <= forwardTable[i].destIP_hi) {
+                forwardTable[i].pktCount += 1;
+                return;
+            } 
+        }
+        // send ask
+        MSG msg;
+        msg = composeASKmsg(srcIP, destIP, switchID);
+        sendFrame(fds[switchID][0], ASK, &msg);
+        return; 
+        
+    }
 }
 // MASTER LOOP
 void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
@@ -600,13 +642,23 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     pollfds[1].fd = -1;
     pollfds[2].fd = -1;
     pollfds[3].fd = -1;
-    pollfds[4].fd = -1;
+    pollfds[4].fd = STDIN_FILENO; pollfds[4].events = POLLIN; pollfds[4].revents = 0;
     char readbuff[MAXLINE];
     char writebuff[MAXWORD];
     //memset(writebuff, 0, MAXWORD);
     //strcpy(writebuff, "HELLO");
     //write(fds[pSwitch->switchID][0], writebuff, MAXWORD);
     vector<fTABLEROW> forwardTable;
+    fTABLEROW initialRule = {
+    /* scrIP_lo*/ 0,
+    /* scrIP_hi */ MAXIP,
+    /* destIP_lo*/ pSwitch->lowIP,
+    /* destIP_hi*/ pSwitch->highIP,
+    /* actiontype*/FORWARD,
+    /* actionVal*/ 3,
+    /* pktCount */ 0
+    };
+    forwardTable.push_back(initialRule);
     FRAME frame;
     MSG msg;
     msg = composeHELLOmsg(pSwitch->switchID, 0, pSwitch->lowIP, pSwitch->highIP, pSwitch->pswj, pSwitch->pswk);
@@ -629,11 +681,12 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         memset(readbuff, 0, MAXLINE);
         if (ADDreceived) { // only read more line ADD received
             if(fgets(readbuff, MAXLINE, (FILE*) fp) != NULL) {
-                //parseFileLine();
+                parseFileLine(readbuff, pSwitch->switchID, forwardTable, fds);
                 ADDreceived = false;
             } else {
                 printf("EOF REACHED\n");
                 EOFreached = true;
+                ADDreceived = false; // so we dont read from file anymore
             }
         }
         // todo; send HELLO and receive HELLO_ACK
@@ -643,15 +696,14 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
             exit(EXIT_FAILURE);
         }
         // poll keyboard
+       
         // poll port3
-
-
-
         for (int i = 0; i < SWITCHPORTS_N - 2; i++) {  // check everything exept keyboard[0 - 3] and port 3
             if (pollfds[i].revents and POLLIN) {
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
                 if (pollfds[i].fd == -1) continue; //closed
                 printFrame("recieved ", &frame);  
+                if (frame.kind == ADD) ADDreceived = true;
                 parseSwitchMSG(pSwitch->switchID, &frame, forwardTable, fds);
                 
             }
