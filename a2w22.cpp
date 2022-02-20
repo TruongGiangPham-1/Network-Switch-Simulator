@@ -644,7 +644,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     pollfds[3].fd = -1;
     pollfds[4].fd = STDIN_FILENO; pollfds[4].events = POLLIN; pollfds[4].revents = 0;
     char readbuff[MAXLINE];
-    char writebuff[MAXWORD];
+    char keyboardbuff[MAXLINE];
     //memset(writebuff, 0, MAXWORD);
     //strcpy(writebuff, "HELLO");
     //write(fds[pSwitch->switchID][0], writebuff, MAXWORD);
@@ -696,7 +696,12 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
             exit(EXIT_FAILURE);
         }
         // poll keyboard
-       
+        if (pollfds[4].revents and POLLIN) {
+            memset(keyboardbuff, 0, MAXLINE);
+            int bytesread = read(pollfds[4].fd, keyboardbuff, MAXLINE);
+            assert(bytesread > 0);
+            parseKeyboardSwitch(keyboardbuff, forwardTable);
+        } 
         // poll port3
         for (int i = 0; i < SWITCHPORTS_N - 2; i++) {  // check everything exept keyboard[0 - 3] and port 3
             if (pollfds[i].revents and POLLIN) {
