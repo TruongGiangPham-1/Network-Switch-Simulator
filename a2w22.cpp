@@ -75,7 +75,7 @@ typedef struct {
 } ASK_PACK;
 
 typedef struct {
-    int nothing;
+    int destSwitchID; // switch id of switch that can enforce rule
     int destIP_lo;
     int destIP_hi;
     tableACTION ACTIONTYPE;
@@ -84,6 +84,9 @@ typedef struct {
 
 typedef struct {
     int nothing;
+    int destSwitchID; // assert(destSwithID == switchID of switch relayed to)
+    int srcIP;  // not needed, but for error check
+    int destIP;  // notneeded, but for error check
 } RELAY_PACK;
 
 
@@ -138,14 +141,14 @@ MSG composeACKmsg ()
     return msg;
 }    
 // ------------------------------
-MSG  composeADDmsg (int dest_lo, int dest_hi, tableACTION action, int actionVAL)
+MSG  composeADDmsg (int dest_lo, int dest_hi, tableACTION action, int actionVAL, int destSwitchID)
 {
     MSG  msg;
     msg.pAdd.ACTIONTYPE = action;
     msg.pAdd.actionVAL = actionVAL;
     msg.pAdd.destIP_lo = dest_lo;
     msg.pAdd.destIP_hi = dest_hi;
-   
+    msg.pAdd.destSwitchID = destSwitchID;
     return msg;
 }
 MSG composeASKmsg(int scrIP, int destIP, int switchID) {
@@ -154,6 +157,15 @@ MSG composeASKmsg(int scrIP, int destIP, int switchID) {
     msg.pAsk.destIP = destIP;
     msg.pAsk.switchID = switchID;
     return msg; 
+
+}
+MSG composeRELAYmsg(FRAME * frame) {
+    MSG msg;
+    assert(frame->kind == ADD);
+    assert((frame->msg).pAdd.ACTIONTYPE == FORWARD);
+    assert((frame->msg).pAdd.actionVAL != 0);
+    msg.pRelay.destSwitchID = (frame->msg).pAdd.destSwitchID; // 
+    return msg;
 
 }
 // ----------------------------
@@ -409,14 +421,21 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
             for (int i = 0; i < sArray.size(); i++) {
                 if (sArray[i].lowIP <= dIP_toASk and dIP_toASk <= sArray[i].highIP) {
                     found = true;
+                    switchIndex = i;
                     break;
                 }
             }
             if ( switchIndex == -1) {  // no found == make DROP rule
-                msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0); // eg (0-1000, 300-300, DROP, 0)
+                msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0, 0); // eg (0-1000, 300-300, DROP, 0)
                 sendFrame(fd, ADD, &msg);
             } else {
-                msg = composeADDmsg(sArray[switchIndex].lowIP,sArray[switchIndex].highIP, FORWARD, switchIndex); 
+                int currSwitchID = (frame->msg).pAsk.switchID;
+                int actionval = 1;  // initially set to port 1
+                if (currSwitchID < sArray[switchIndex].switchID) {
+                    actionval = 2; // destSwitchID > currID so relay to port 2
+                }
+                msg = composeADDmsg(sArray[switchIndex].lowIP,sArray[switchIndex].highIP, FORWARD, actionval, 
+                sArray[switchIndex].switchID); 
                 sendFrame(fd, ADD, &msg);
             }
             master->ackCount +=1;
@@ -432,9 +451,10 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
         break;
     }
 }
-void parseSwitchMSG(int fd, FRAME * frame, vector<fTABLEROW>&forwardTable, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
+void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTable, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     MSG msg;
     msg = frame->msg;
+    MSG sendmsg;
     switch (frame->kind)
     {
     case ADD:
@@ -456,7 +476,14 @@ void parseSwitchMSG(int fd, FRAME * frame, vector<fTABLEROW>&forwardTable, int f
             } else if (rule.ACTIONTYPE == FORWARD) {
                 // relay to port, pipe fds[i][i + 1] if port 2
                 // relay to pipe fds[i][i - 1] if port 1
-                
+                // composeRelayMSg 
+                if (rule.actionVAL == 1) {
+                    sendmsg = composeRELAYmsg(frame);
+                    sendFrame(fds[currSwitchID][currSwitchID + 1], RELAY, &sendmsg);
+                } else if (rule.actionVAL == 2) {
+                    sendmsg = composeRELAYmsg(frame);
+                    sendFrame(fds[currSwitchID][currSwitchID - 1], RELAY, &sendmsg);
+                }
 
             }
             break;
@@ -473,6 +500,7 @@ int parseFileLine(char * readbuf) {
     if (readbuf[0] == '#') {
         return 0;
     } 
+    return 1;
 }
 // MASTER LOOP
 void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
