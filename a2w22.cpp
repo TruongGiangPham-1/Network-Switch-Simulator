@@ -652,7 +652,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
                 if (pollfds[i].fd == -1) continue; //closed
                 printFrame("recieved ", &frame);  
-                parseSwitchMSG(pollfds[i].fd, &frame, forwardTable, fds);
+                parseSwitchMSG(pSwitch->switchID, &frame, forwardTable, fds);
                 
             }
         }
