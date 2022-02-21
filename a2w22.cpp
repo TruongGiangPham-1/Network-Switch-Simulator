@@ -497,14 +497,14 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
             if (rule.ACTIONTYPE == DROP) {
                 forwardTable[forwardTable.size() - 1].pktCount += 1;
             } else if (rule.ACTIONTYPE == FORWARD) {
-                // relay to port, pipe fds[i][i + 1] if port 2
-                // relay to pipe fds[i][i - 1] if port 1
+                // relay to port 2, use  fds[i][i + 1] 
+                // relay to port 1, use fds[i][i - 1] 
                 // composeRelayMSg 
-                if (rule.actionVAL == 1) {
+                if (rule.actionVAL == 2) {
                     assert(fds[currSwitchID][currSwitchID + 1] > 0);
                     sendmsg = composeRELAYmsg(frame);
                     sendFrame(fds[currSwitchID][currSwitchID + 1], RELAY, &sendmsg);
-                } else if (rule.actionVAL == 2) {
+                } else if (rule.actionVAL == 1) {
                     assert(fds[currSwitchID][currSwitchID - 1] > 0);
                     sendmsg = composeRELAYmsg(frame);
                     sendFrame(fds[currSwitchID][currSwitchID - 1], RELAY, &sendmsg);
