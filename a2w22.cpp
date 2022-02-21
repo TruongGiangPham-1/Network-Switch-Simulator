@@ -521,14 +521,15 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
     {
         if (msg.pRelay.destSwitchID == currSwitchID) {
             // this is the switch that we can add rule to.
-            for (int i = 0; i < forwardTable.size(); i++) {
-                if (msg.pRelay.destIP >= forwardTable[i].destIP_lo and msg.pRelay.destIP <= forwardTable[i].destIP_hi) {
-                    forwardTable[i].pktCount += 1;
-                    return;
-                }
-            } 
+            //for (int i = 0; i < forwardTable.size(); i++) {
+            //    if (msg.pRelay.destIP >= forwardTable[i].destIP_lo and msg.pRelay.destIP <= forwardTable[i].destIP_hi) {
+            //        forwardTable[i].pktCount += 1;
+            //        return;
+            //    }
+            //} 
         } // else we relay to whichever port of this switch TODO
         (pSwitch->nRELAYIN) += 1;
+        break;
     } 
     default:
         break;
@@ -579,6 +580,20 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
                 if (forwardTable[i].ACTIONTYPE == FORWARD and forwardTable[i].actionVAL != 3) {
                     // case: if we have to relay this packet to diff switch
                     pswitch->nRelayout += 1;
+                    // send relay?
+                    MSG addmsg;
+                    MSG relaymsg;
+                    addmsg = composeADDmsg(0, 0, FORWARD, forwardTable[i].actionVAL, forwardTable[i].actionVAL);
+                    FRAME f1;
+                    f1.msg = addmsg;
+                    f1.kind = ADD;
+                    relaymsg = composeRELAYmsg(&f1);
+                    if (forwardTable[i].actionVAL == 1) { // relay to port 1
+                        sendFrame(fds[switchID][switchID - 1], RELAY, &relaymsg);
+                    } else if (forwardTable[i].actionVAL == 2) {  // relay to port 2
+                        sendFrame(fds[switchID][switchID + 1], RELAY, &relaymsg);
+                    }
+
                 }
                 return 2;
             } 
@@ -662,7 +677,9 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         assert(fds[pSwitch->switchID][pSwitch->pswj] > 0);
         assert(fds[pSwitch->pswj][pSwitch->switchID] > 0);
     } else {  // case: pswj is null
-        fds[pSwitch->pswj][pSwitch->switchID] = -1;
+        printf("1hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
+        fds[pSwitch->pswj][pSwitch->switchID] = -1;  // this shares memory with nASKswitch
+        printf("2hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
     }
     if (pSwitch->pswk != -1) {
         fifo_i_k = getfifoName(pSwitch->switchID, pSwitch->pswk);
@@ -706,7 +723,12 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     sendFrame(fds[pSwitch->switchID][0], HELLO, &msg);
     int ackowledge = getACK(pollfds);
     assert(ackowledge == 1); // assert its ackolowdged
-    pSwitch->nACKreceived += 1;
+    //printf("hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
+    (pSwitch->nHELLOtransm) = 1;
+    (pSwitch->nACKreceived) = 1;
+    //printf("hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
+    assert(pSwitch->nACKreceived > 0);
+    assert(pSwitch->nHELLOtransm > 0);
     // open DATAFILE
     FILE *fp;
     char* result;
