@@ -377,7 +377,7 @@ void printInfoSwitch(vector<fTABLEROW>&forwardTable, SWITCH * sw) {
     printf("Packet Stats:\n");
     printf("Received: ADMIT: %d, HELLO_ACK: %d, ADD: %d, RELAYIN: %d\n", 
     sw->admit, sw->nACKreceived, sw->nADDreceived, sw->nRELAYIN);
-    printf("Transmitted: HELLO: %d, ASK: %d, RELAYIN: %d\n", 
+    printf("Transmitted: HELLO: %d, ASK: %d, RELAYOUT: %d\n", 
     sw->nHELLOtransm, sw->nASKtrans, sw->nRelayout); 
 }
 void parseKeyboardSwitch(const char* keyboardInput, vector<fTABLEROW>&ftable, SWITCH *sw) {
@@ -576,7 +576,10 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
             // assumes that lowip is within range
             if (forwardTable[i].destIP_lo <= destIP and destIP <= forwardTable[i].destIP_hi) {
                 forwardTable[i].pktCount += 1;
-
+                if (forwardTable[i].ACTIONTYPE == FORWARD and forwardTable[i].actionVAL != 3) {
+                    // case: if we have to relay this packet to diff switch
+                    pswitch->nRelayout += 1;
+                }
                 return 2;
             } 
         }
