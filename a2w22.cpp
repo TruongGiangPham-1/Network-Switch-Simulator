@@ -224,11 +224,13 @@ void printFrame (const char *prefix, FRAME *frame)
     case ASK:
     {
         printf("[ASK]: header= (srcIP= %d, destIP=%d)\n", msg.pAsk.scrIP, msg.pAsk.destIP);
+        break;
     }
     case ADD:
     {
-        printf("[ADD]: (srcIP-0-1000, destIP=%d-%d, action=%s:%d, pktCount= 0\n", 
+        printf("[ADD]: (srcIP: 0-1000, destIP=%d-%d, action=%s:%d, pktCount= 0\n", 
         msg.pAdd.destIP_lo, msg.pAdd.destIP_hi, ACTIONNAME[msg.pAdd.ACTIONTYPE], msg.pAdd.actionVAL);
+        break;
     }
     default:
         break;
@@ -447,6 +449,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
                     break;
                 }
             }
+            printf("before compose ADD \n");
             if ( switchIndex == -1) {  // no found == make DROP rule
                 msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0, 0); // eg (0-1000, 300-300, DROP, 0)
                 sendFrame(fd, ADD, &msg);
@@ -510,6 +513,7 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
                     sendFrame(fds[currSwitchID][currSwitchID - 1], RELAY, &sendmsg);
                 }
                 forwardTable[forwardTable.size() - 1].pktCount += 1;
+                pSwitch->nRelayout += 1;
             }
             break;
         }
@@ -633,7 +637,6 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
                 if (pollfds[i].fd == -1) continue; // other end closed pipe so rcvFrame() changed fd to -1
                 printFrame("recieved ", &frame); 
                 parseAndSendToSwitch(fds[0][i], &frame, sArray, masterswitch, nullptr);
-                
                 pollfds[i].revents = 0;
             }
         }
