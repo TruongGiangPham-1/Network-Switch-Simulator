@@ -653,23 +653,29 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         fifo_j_i = getfifoName(pSwitch->pswj, pSwitch->switchID);
         fds[pSwitch->pswj][pSwitch->switchID] = openfifoRead(fifo_j_i);
         fds[pSwitch->switchID][pSwitch->pswj] = openfifoWrite(fifo_i_j);
+        assert(fds[pSwitch->switchID][pSwitch->pswj] > 0);
+        assert(fds[pSwitch->pswj][pSwitch->switchID] > 0);
+    } else {  // case: pswj is null
+        fds[pSwitch->pswj][pSwitch->switchID] = -1;
     }
     if (pSwitch->pswk != -1) {
         fifo_i_k = getfifoName(pSwitch->switchID, pSwitch->pswk);
         fifo_k_i = getfifoName(pSwitch->pswk, pSwitch->switchID);
         fds[pSwitch->pswk][pSwitch->switchID] = openfifoRead(fifo_k_i);
         fds[pSwitch->switchID][pSwitch->pswk] = openfifoWrite(fifo_i_k);
+        assert(fds[pSwitch->switchID][pSwitch->pswk] > 0);
+        assert(fds[pSwitch->pswk][pSwitch->switchID] > 0);
+    } else {  // case: pswk is null
+        fds[pSwitch->pswk][pSwitch->switchID] = -1;
     }
     fds[0][pSwitch->switchID] = openfifoRead(fifo_master_i);
     fds[pSwitch->switchID][0] = openfifoWrite(fifo_i_master);
-
+    
     pollfd pollfds[SWITCHPORTS_N]; // = 5
     //pollfds[0] = fifo-0-i/master to pswi; pollfds[1]=port1l pollfds[2]=port2, pollfds[4] = keyboard
-
-    pollfds[0].fd = fds[0][pSwitch->switchID];
-    pollfds[0].events = POLLIN; 
-    pollfds[1].fd = -1;
-    pollfds[2].fd = -1;
+    pollfds[0].fd = fds[0][pSwitch->switchID]; pollfds[0].events = POLLIN; 
+    pollfds[1].fd = fds[pSwitch->pswj][pSwitch->switchID]; pollfds[1].events = POLLIN;
+    pollfds[2].fd = fds[pSwitch->pswk][pSwitch->switchID]; pollfds[2].events = POLLIN;
     pollfds[3].fd = -1;
     pollfds[4].fd = STDIN_FILENO; pollfds[4].events = POLLIN; pollfds[4].revents = 0;
     char readbuff[MAXLINE];
@@ -703,13 +709,12 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     if (fp == NULL) {
         perror("fopen FAILED: ");
     }
-    //msg = composeASKmsg(200, 300, pSwitch->switchID);
-    //sendFrame(fds[pSwitch->switchID][0], ASK, &msg);
+
     bool EOFreached = false;
     bool ADDreceived = true;
     while (true) {
         memset(readbuff, 0, MAXLINE);
-        if (ADDreceived) { // only read more line ADD received
+        if (ADDreceived) { // only read more line if ADD received
             if(fgets(readbuff, MAXLINE, (FILE*) fp) != NULL) {
                 int ret = parseFileLine(readbuff, pSwitch->switchID, forwardTable, fds, pSwitch);
                 if (ret == 1) {  // means that we sent ASK
