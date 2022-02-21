@@ -663,6 +663,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
 // pSwitch loop
 void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const char* datafile) {
     // establish connection with master/pswj/pswk
+    pollfd pollfds[SWITCHPORTS_N]; // = 5
     string fifo_i_master = getfifoName(pSwitch -> switchID, 0);
     string fifo_master_i = getfifoName(0, pSwitch->switchID);  // READ
     string fifo_i_j;
@@ -676,10 +677,10 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         fds[pSwitch->switchID][pSwitch->pswj] = openfifoWrite(fifo_i_j);
         assert(fds[pSwitch->switchID][pSwitch->pswj] > 0);
         assert(fds[pSwitch->pswj][pSwitch->switchID] > 0);
+        pollfds[1].fd = fds[pSwitch->pswj][pSwitch->switchID]; pollfds[1].events = POLLIN;
     } else {  // case: pswj is null
-        printf("1hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
-        fds[pSwitch->pswj][pSwitch->switchID] = -1;  // this shares memory with nASKswitch
-        printf("2hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
+        //fds[pSwitch->pswj][pSwitch->switchID] = -1;  // this shares memory with nASKswitch BECUASE its fds[-1][i]
+        pollfds[1].fd = -1;
     }
     if (pSwitch->pswk != -1) {
         fifo_i_k = getfifoName(pSwitch->switchID, pSwitch->pswk);
@@ -688,24 +689,23 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         fds[pSwitch->switchID][pSwitch->pswk] = openfifoWrite(fifo_i_k);
         assert(fds[pSwitch->switchID][pSwitch->pswk] > 0);
         assert(fds[pSwitch->pswk][pSwitch->switchID] > 0);
+        pollfds[2].fd = fds[pSwitch->pswk][pSwitch->switchID]; pollfds[2].events = POLLIN;
+        
     } else {  // case: pswk is null
-        fds[pSwitch->pswk][pSwitch->switchID] = -1;
+        //fds[pSwitch->pswk][pSwitch->switchID] = -1;
+        pollfds[2].fd = -1;
     }
     fds[0][pSwitch->switchID] = openfifoRead(fifo_master_i);
     fds[pSwitch->switchID][0] = openfifoWrite(fifo_i_master);
     
-    pollfd pollfds[SWITCHPORTS_N]; // = 5
+    //pollfd pollfds[SWITCHPORTS_N]; // = 5
     //pollfds[0] = fifo-0-i/master to pswi; pollfds[1]=port1l pollfds[2]=port2, pollfds[4] = keyboard
     pollfds[0].fd = fds[0][pSwitch->switchID]; pollfds[0].events = POLLIN; 
-    pollfds[1].fd = fds[pSwitch->pswj][pSwitch->switchID]; pollfds[1].events = POLLIN;
-    pollfds[2].fd = fds[pSwitch->pswk][pSwitch->switchID]; pollfds[2].events = POLLIN;
     pollfds[3].fd = -1;
     pollfds[4].fd = STDIN_FILENO; pollfds[4].events = POLLIN; pollfds[4].revents = 0;
     char readbuff[MAXLINE];
     char keyboardbuff[MAXLINE];
-    //memset(writebuff, 0, MAXWORD);
-    //strcpy(writebuff, "HELLO");
-    //write(fds[pSwitch->switchID][0], writebuff, MAXWORD);
+
     vector<fTABLEROW> forwardTable;
     fTABLEROW initialRule = {
     /* scrIP_lo*/ 0,
@@ -724,8 +724,8 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     int ackowledge = getACK(pollfds);
     assert(ackowledge == 1); // assert its ackolowdged
     //printf("hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
-    (pSwitch->nHELLOtransm) = 1;
-    (pSwitch->nACKreceived) = 1;
+    (pSwitch->nHELLOtransm) += 1;
+    (pSwitch->nACKreceived) += 1;
     //printf("hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
     assert(pSwitch->nACKreceived > 0);
     assert(pSwitch->nHELLOtransm > 0);
