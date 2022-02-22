@@ -10,6 +10,8 @@
 #include <vector>
 #include <poll.h>
 #include <utility> // for PAIR
+#include <sys/time.h>  // for setitimer
+#include <signal.h>  // for signal()
 
 
 using namespace std;
@@ -19,6 +21,7 @@ using namespace std;
 #define MAX_SWITCH 7
 #define SWITCHPORTS_N 5
 #define MAXIP 1000
+int canRead = true; // flag for delay, if !canRead, we dont read from file
 
 typedef pair<int, int> PII; // PII = pair int int
 typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
@@ -71,7 +74,7 @@ typedef struct {
 } HELLO_PACK;
 
 typedef struct {
-    int nothing;
+    int destID;
 } HELLO_ACK_PACK;
 
 typedef struct {
@@ -123,7 +126,25 @@ void WARNING (const char *fmt, ... )
     va_start (ap, fmt);  vfprintf (stderr, fmt, ap);  va_end(ap);
 }
 // ------------------------------
-
+// ALARM AND SIGNAL STUFF FOR DELAY AND SIGNAL
+void timerHandler() {
+    printf("timer done \n");
+    canRead = true; // set it to true so we can read it
+}
+void callTimer(int delay) {
+    struct itimerval timer;
+    // we dont want polling timer so dont trigger it periodically
+    timer.it_interval.tv_sec = 0;
+    timer.it_interval.tv_usec = 0;
+    //
+    timer.it_value.tv_sec = delay / 1000; // get sec component;
+    timer.it_value.tv_usec = (delay % 1000) * 1000; // microsec component
+    // total timer time = tv_sec + tv_usec
+    if (setitimer(ITIMER_REAL, &timer, NULL) == -1) {
+        perror("error calling setitimer()");
+        exit(1);
+    }
+}
 
 // ------------------------------
 MSG composeHELLOmsg (int switchID, int nNeighbor, int lowIP, int highIP, int pswj, int pswk)
@@ -140,11 +161,11 @@ MSG composeHELLOmsg (int switchID, int nNeighbor, int lowIP, int highIP, int psw
     return msg;
 }    
 // ------------------------------    
-MSG composeACKmsg ()
+MSG composeACKmsg (int destid)
 {
     MSG  msg;
     memset( (char *) &msg, 0, sizeof(msg) );
-    msg.pHelloAck.nothing = 0; // dummy value
+    msg.pHelloAck.destID = destid; // dummy value
     return msg;
 }    
 // ------------------------------
@@ -215,11 +236,28 @@ void printFrame (const char *prefix, FRAME *frame)
     {
     case HELLO/* constant-expression */:
         /* code */
-        printf("switchID: [%d], nNeighbor: [%d], lowIP: [%d], highIP: [%d]\n", msg.pHello.switchNUM, msg.pHello.Nneighbor, 
-               msg.pHello.lowIP, msg.pHello.highIP);
-        break;
+        {
+            //printf("switchID: [%d], nNeighbor: [%d], lowIP: [%d], highIP: [%d]\n", msg.pHello.switchNUM, msg.pHello.Nneighbor, 
+                //msg.pHello.lowIP, msg.pHello.highIP);
+            string port1Str;
+            string port2Str;
+            if (msg.pHello.pswj == -1) {
+                port1Str = "null";
+            } else {
+                port1Str = "psw" + to_string(msg.pHello.pswj);
+            }
+            if (msg.pHello.pswk == -1) {
+                port2Str = "null";
+            } else {
+                port2Str = "psw" + to_string(msg.pHello.pswk);
+            }
+            printf("(scr= psw%d, dest= master) [HELLO]:\n", msg.pHello.switchNUM);
+            printf("     (port0= master, port1=%s, port2=%s, port3=%d-%d\n", port1Str.c_str(), port2Str.c_str(),
+            msg.pHello.lowIP, msg.pHello.highIP);
+            break;
+        }
     case HELLO_ACK:
-        printf("ACKED\n");
+        printf("(src= master, dest=psw%d) [HELLO_ACK]\n", msg.pHelloAck.destID);
         break;
     case ASK:
     {
@@ -237,6 +275,8 @@ void printFrame (const char *prefix, FRAME *frame)
     }
     
 }
+
+
 // ------------------------------
 
 PII getLowIP_HighIP(const char * ips) {
@@ -424,7 +464,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
         {
             master->helloCount += 1;
             master->ackCount += 1;
-            msg = composeACKmsg();
+            msg = composeACKmsg((frame->msg).pHello.switchNUM);
             sendFrame(fd, HELLO_ACK, &msg);
             SWITCH incomingSwitch = {
                 /*.switchID = */ (frame->msg).pHello.switchNUM,
@@ -606,6 +646,13 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
         return 1; 
         
     }
+    if (tokens[0][3] == switchID_char and tokens[1] == "delay") {
+        // handle delay packet
+        int delay = stoi(tokens[2]);
+        callTimer(delay);
+        canRead = false;
+        printf("delaying for %d\n", delay);
+    }
     return 0;
 }
 // MASTER LOOP
@@ -742,7 +789,8 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     bool ADDreceived = true;
     while (true) {
         memset(readbuff, 0, MAXLINE);
-        if (ADDreceived) { // only read more line if ADD received
+        if (ADDreceived and canRead) { // only read more line if ADD received
+            
             if(fgets(readbuff, MAXLINE, (FILE*) fp) != NULL) {
                 int ret = parseFileLine(readbuff, pSwitch->switchID, forwardTable, fds, pSwitch);
                 if (ret == 1) {  // means that we sent ASK
@@ -758,9 +806,15 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         // todo; send HELLO and receive HELLO_ACK
         int pollret = poll(pollfds, SWITCHPORTS_N, 1);
         if (pollret < 0) {
+            if (errno == EINTR) {  // casued by SIGALARM to interupt poll
+                //cerr << "EINTR error while poll" << endl;
+                continue;
+            }
             cerr << "pollret returned -1" << endl;
+            //fprintf(stderr, "%s\n", explain_poll(pollfds, SWITCHPORTS_N, 1));
             exit(EXIT_FAILURE);
         }
+        //printf("reached after poll\n");
         // poll keyboard
         if (pollfds[4].revents and POLLIN) {
             memset(keyboardbuff, 0, MAXLINE);
@@ -789,7 +843,11 @@ int main(int argc, char *argv[]) {
     SWITCH pSwitch;
     MASTERSWITCH master;
     
-    // parse the input 
+    // install signal handler
+    if (signal(SIGALRM, (void (*)(int))timerHandler) == SIG_ERR) {
+        perror("Unable to catch SIGALARM");
+        exit(1);
+    }
     // open fifo
 
     if (argc == 3 and strcmp(argv[1], "master") == 0) {
