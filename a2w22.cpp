@@ -128,7 +128,7 @@ void WARNING (const char *fmt, ... )
 // ------------------------------
 // ALARM AND SIGNAL STUFF FOR DELAY AND SIGNAL
 void timerHandler() {
-    printf("timer done \n");
+    printf("** Delay period ended\n");
     canRead = true; // set it to true so we can read it
 }
 void callTimer(int delay) {
@@ -573,10 +573,18 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
                     assert(fds[currSwitchID][currSwitchID + 1] > 0);
                     sendmsg = composeRELAYmsg(frame, currSwitchID);
                     sendFrame(fds[currSwitchID][currSwitchID + 1], RELAY, &sendmsg);
+                    //FRAME relayF;
+                    //relayF.msg = sendmsg;
+                    //relayF.kind = RELAY;
+                    //printFrame("Transmitted ", &relayF);
                 } else if (rule.actionVAL == 1) {
                     assert(fds[currSwitchID][currSwitchID - 1] > 0);
                     sendmsg = composeRELAYmsg(frame, currSwitchID);
                     sendFrame(fds[currSwitchID][currSwitchID - 1], RELAY, &sendmsg);
+                    //FRAME relayF;
+                    //relayF.msg = sendmsg;
+                    //relayF.kind = RELAY;
+                    //printFrame("Transmitted ", &relayF);
                 }
                 forwardTable[forwardTable.size() - 1].pktCount += 1;
                 pSwitch->nRelayout += 1;
@@ -659,16 +667,22 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
                     } else if (forwardTable[i].actionVAL == 2) {  // relay to port 2
                         sendFrame(fds[switchID][switchID + 1], RELAY, &relaymsg);
                     }
+                    // print statement
+           
 
                 }
                 return 2;
             } 
         }
         // send ask
-        printf("ASK send\n");
+        //printf("ASK send\n");
         MSG msg;
         msg = composeASKmsg(srcIP, destIP, switchID);
         sendFrame(fds[switchID][0], ASK, &msg);
+        FRAME printASK;
+        printASK.kind = ASK;
+        printASK.msg = msg;
+        printFrame("Transmitted  ", &printASK);
         return 1; 
         
     }
@@ -677,7 +691,9 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
         int delay = stoi(tokens[2]);
         callTimer(delay);
         canRead = false;
-        printf("delaying for %d\n", delay);
+        printf("\n");
+        printf("**Entering a delay period of %d msec\n", delay);
+        printf("\n");
     }
     return 0;
 }
@@ -794,6 +810,12 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     MSG msg;
     msg = composeHELLOmsg(pSwitch->switchID, 0, pSwitch->lowIP, pSwitch->highIP, pSwitch->pswj, pSwitch->pswk);
     sendFrame(fds[pSwitch->switchID][0], HELLO, &msg);
+    // print 
+    FRAME printHel;
+    printHel.kind = HELLO;
+    printHel.msg = msg;
+    printFrame("Transmitted ", &printHel);
+    //
     int ackowledge = getACK(pollfds);
     assert(ackowledge == 1); // assert its ackolowdged
     //printf("hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
