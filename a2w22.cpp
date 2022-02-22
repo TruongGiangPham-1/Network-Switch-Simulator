@@ -193,6 +193,7 @@ MSG composeRELAYmsg(FRAME * frame) {
     assert((frame->msg).pAdd.ACTIONTYPE == FORWARD);
     assert((frame->msg).pAdd.actionVAL != 0);
     msg.pRelay.destSwitchID = (frame->msg).pAdd.destSwitchID; // 
+    //msg.pRelay.switchID = (frame->msg).pAdd.
     return msg;
 
 }
