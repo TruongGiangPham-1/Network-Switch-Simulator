@@ -129,7 +129,9 @@ void WARNING (const char *fmt, ... )
 // ------------------------------
 // ALARM AND SIGNAL STUFF FOR DELAY AND SIGNAL
 void timerHandler() {
+    printf("\n");
     printf("** Delay period ended\n");
+    printf("\n");
     canRead = true; // set it to true so we can read it
 }
 void callTimer(int delay) {
@@ -287,7 +289,7 @@ void printFrame (const char *prefix, FRAME *frame)
     }
     case RELAY:
     {
-        printf("src= psw%d, dest= psw%d)  [RELAY]: header= (srcIP= %d, destIP= %d\n", 
+        printf("src= psw%d, dest= psw%d)  [RELAY]: header= (srcIP= %d, destIP= %d)\n", 
         msg.pRelay.switchID, msg.pRelay.destSwitchID, msg.pRelay.srcIP, msg.pRelay.destIP);
     }
     default:
@@ -667,7 +669,7 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
                     // send relay?
                     MSG addmsg;
                     MSG relaymsg;
-                    addmsg = composeADDmsg(0, 0, FORWARD, forwardTable[i].actionVAL, forwardTable[i].actionVAL, switchID);
+                    addmsg = composeADDmsg(srcIP, destIP, FORWARD, forwardTable[i].actionVAL, forwardTable[i].actionVAL, switchID);
                     FRAME f1;
                     f1.msg = addmsg;
                     f1.kind = ADD;
