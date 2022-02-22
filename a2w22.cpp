@@ -480,6 +480,10 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
             master->ackCount += 1;
             msg = composeACKmsg((frame->msg).pHello.switchNUM);
             sendFrame(fd, HELLO_ACK, &msg);
+            FRAME fack;
+            fack.kind = HELLO_ACK;
+            fack.msg = msg;
+            printFrame("Transmitted  ", &fack);
             SWITCH incomingSwitch = {
                 /*.switchID = */ (frame->msg).pHello.switchNUM,
                 /*.lowIP = */(frame->msg).pHello.lowIP,
@@ -507,6 +511,10 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
             if ( switchIndex == -1) {  // no found == make DROP rule
                 msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0, 0); // eg (0-1000, 300-300, DROP, 0)
                 sendFrame(fd, ADD, &msg);
+                FRAME fadd;
+                fadd.kind = ADD;
+                fadd.msg = msg;
+                printFrame("Transmitted  ", &fadd);
             } else {
                 int currSwitchID = (frame->msg).pAsk.switchID;
                 int actionval = 1;  // initially set to port 1
@@ -516,6 +524,10 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
                 msg = composeADDmsg(sArray[switchIndex].lowIP,sArray[switchIndex].highIP, FORWARD, actionval, 
                 sArray[switchIndex].switchID); 
                 sendFrame(fd, ADD, &msg);
+                FRAME fadd;
+                fadd.kind = ADD;
+                fadd.msg = msg;
+                printFrame("Transmitted  ", &fadd);
             }
             master->ackCount +=1;
             master->addCount +=1;
