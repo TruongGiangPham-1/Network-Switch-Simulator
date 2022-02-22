@@ -93,7 +93,7 @@ typedef struct {
 } ADD_PACK;
 
 typedef struct {
-    int nothing;
+    int switchID;  // source switch id
     int destSwitchID; // assert(destSwithID == switchID of switch relayed to)
     int srcIP;  // not needed, but for error check
     int destIP;  // notneeded, but for error check
@@ -275,6 +275,11 @@ void printFrame (const char *prefix, FRAME *frame)
         printf(" scrIP=0-1000, destIP= %d-%d, action= %s:%d, pktCount=0\n", 
         msg.pAdd.destIP_lo, msg.pAdd.destIP_hi, ACTIONNAME[msg.pAdd.ACTIONTYPE], msg.pAdd.actionVAL);
         break;
+    }
+    case RELAY:
+    {
+        //printf("src= psw%d, dest= psw%d)  [RELAY]: header= (srcIP= %d, destIP= %d\n", 
+        //msg.pRelay.)
     }
     default:
         break;
