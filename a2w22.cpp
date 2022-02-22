@@ -90,6 +90,7 @@ typedef struct {
     int destIP_hi;
     tableACTION ACTIONTYPE;
     int actionVAL;
+    int currSwitchID; // id to switch that send ask
 } ADD_PACK;
 
 typedef struct {
@@ -169,14 +170,18 @@ MSG composeACKmsg (int destid)
     return msg;
 }    
 // ------------------------------
-MSG  composeADDmsg (int dest_lo, int dest_hi, tableACTION action, int actionVAL, int destSwitchID)
+MSG  composeADDmsg (int dest_lo, int dest_hi, tableACTION action, int actionVAL, int destSwitchID, int switchID)
 {
     MSG  msg;
+    //printf("in composeADD\n");
+    //printf("line 176\n");
     msg.pAdd.ACTIONTYPE = action;
     msg.pAdd.actionVAL = actionVAL;
     msg.pAdd.destIP_lo = dest_lo;
     msg.pAdd.destIP_hi = dest_hi;
     msg.pAdd.destSwitchID = destSwitchID;
+    msg.pAdd.currSwitchID = switchID;
+    //printf("line 183\n");
     return msg;
 }
 MSG composeASKmsg(int scrIP, int destIP, int switchID) {
@@ -274,7 +279,8 @@ void printFrame (const char *prefix, FRAME *frame)
     {
         //printf("[ADD]: (srcIP: 0-1000, destIP=%d-%d, action=%s:%d, pktCount= 0\n", 
         //msg.pAdd.destIP_lo, msg.pAdd.destIP_hi, ACTIONNAME[msg.pAdd.ACTIONTYPE], msg.pAdd.actionVAL);
-        printf("(src= master, dest= psw%d) [ADD]:\n", msg.pAdd.destSwitchID);
+        //printf("PRINTING ADD\n");
+        printf("(src= master, dest= psw%d) [ADD]:\n", msg.pAdd.currSwitchID);
         printf(" scrIP=0-1000, destIP= %d-%d, action= %s:%d, pktCount=0\n", 
         msg.pAdd.destIP_lo, msg.pAdd.destIP_hi, ACTIONNAME[msg.pAdd.ACTIONTYPE], msg.pAdd.actionVAL);
         break;
@@ -509,20 +515,24 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
             }
             printf("before compose ADD \n");
             if ( switchIndex == -1) {  // no found == make DROP rule
-                msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0, 0); // eg (0-1000, 300-300, DROP, 0)
+                //assert(sw->switchID > 0);  // segfault cuz sw is null
+                msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0, 0, (frame->msg).pAsk.switchID); // eg (0-1000, 300-300, DROP, 0)
                 sendFrame(fd, ADD, &msg);
+                //printf("line 517\n");
                 FRAME fadd;
                 fadd.kind = ADD;
                 fadd.msg = msg;
                 printFrame("Transmitted  ", &fadd);
+                //printf("line 522\n");
             } else {
+                //printf("line 527\n");
                 int currSwitchID = (frame->msg).pAsk.switchID;
                 int actionval = 1;  // initially set to port 1
                 if (currSwitchID < sArray[switchIndex].switchID) {
                     actionval = 2; // destSwitchID > currID so relay to port 2
                 }
                 msg = composeADDmsg(sArray[switchIndex].lowIP,sArray[switchIndex].highIP, FORWARD, actionval, 
-                sArray[switchIndex].switchID); 
+                sArray[switchIndex].switchID, (frame->msg).pAsk.switchID); 
                 sendFrame(fd, ADD, &msg);
                 FRAME fadd;
                 fadd.kind = ADD;
@@ -657,7 +667,7 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
                     // send relay?
                     MSG addmsg;
                     MSG relaymsg;
-                    addmsg = composeADDmsg(0, 0, FORWARD, forwardTable[i].actionVAL, forwardTable[i].actionVAL);
+                    addmsg = composeADDmsg(0, 0, FORWARD, forwardTable[i].actionVAL, forwardTable[i].actionVAL, switchID);
                     FRAME f1;
                     f1.msg = addmsg;
                     f1.kind = ADD;
