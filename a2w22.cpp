@@ -261,12 +261,18 @@ void printFrame (const char *prefix, FRAME *frame)
         break;
     case ASK:
     {
-        printf("[ASK]: header= (srcIP= %d, destIP=%d)\n", msg.pAsk.scrIP, msg.pAsk.destIP);
+        //printf("[ASK]: header= (srcIP= %d, destIP=%d)\n", msg.pAsk.scrIP, msg.pAsk.destIP);
+        printf("(scr=psw%d, dest= master) [ASK]: header= (srcIP= %d, destIP= %d)\n"
+        ,msg.pAsk.switchID, msg.pAsk.scrIP, msg.pAsk.destIP);
         break;
+
     }
     case ADD:
     {
-        printf("[ADD]: (srcIP: 0-1000, destIP=%d-%d, action=%s:%d, pktCount= 0\n", 
+        //printf("[ADD]: (srcIP: 0-1000, destIP=%d-%d, action=%s:%d, pktCount= 0\n", 
+        //msg.pAdd.destIP_lo, msg.pAdd.destIP_hi, ACTIONNAME[msg.pAdd.ACTIONTYPE], msg.pAdd.actionVAL);
+        printf("(src= master, dest= psw%d) [ADD]:\n", msg.pAdd.destSwitchID);
+        printf(" scrIP=0-1000, destIP= %d-%d, action= %s:%d, pktCount=0\n", 
         msg.pAdd.destIP_lo, msg.pAdd.destIP_hi, ACTIONNAME[msg.pAdd.ACTIONTYPE], msg.pAdd.actionVAL);
         break;
     }
