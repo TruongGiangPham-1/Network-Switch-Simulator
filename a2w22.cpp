@@ -492,6 +492,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
             fack.kind = HELLO_ACK;
             fack.msg = msg;
             printFrame("Transmitted  ", &fack);
+            printf("\n");
             SWITCH incomingSwitch = {
                 /*.switchID = */ (frame->msg).pHello.switchNUM,
                 /*.lowIP = */(frame->msg).pHello.lowIP,
@@ -525,6 +526,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
                 fadd.kind = ADD;
                 fadd.msg = msg;
                 printFrame("Transmitted  ", &fadd);
+                printf("\n");
                 //printf("line 522\n");
             } else {
                 //printf("line 527\n");
@@ -540,6 +542,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
                 fadd.kind = ADD;
                 fadd.msg = msg;
                 printFrame("Transmitted  ", &fadd);
+                printf("\n");
             }
             master->ackCount +=1;
             master->addCount +=1;
@@ -563,6 +566,7 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
     case ADD:
         {
             // add to forwarding table
+            printf("\n");
             (pSwitch->nADDreceived) += 1;
             fTABLEROW rule = {
                 /* scrIP_lo*/ 0,
@@ -830,6 +834,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     //
     int ackowledge = getACK(pollfds);
     assert(ackowledge == 1); // assert its ackolowdged
+    printf("\n");
     //printf("hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
     (pSwitch->nHELLOtransm) += 1;
     (pSwitch->nACKreceived) += 1;
