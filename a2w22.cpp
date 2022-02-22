@@ -187,13 +187,15 @@ MSG composeASKmsg(int scrIP, int destIP, int switchID) {
     return msg; 
 
 }
-MSG composeRELAYmsg(FRAME * frame) {
+MSG composeRELAYmsg(FRAME * frame, int switchID) {
     MSG msg;
     assert(frame->kind == ADD);
     assert((frame->msg).pAdd.ACTIONTYPE == FORWARD);
     assert((frame->msg).pAdd.actionVAL != 0);
     msg.pRelay.destSwitchID = (frame->msg).pAdd.destSwitchID; // 
-    //msg.pRelay.switchID = (frame->msg).pAdd.
+    msg.pRelay.switchID = switchID;
+    msg.pRelay.srcIP = (frame->msg).pAdd.destIP_lo;
+    msg.pRelay.destIP = (frame->msg).pAdd.destIP_hi;
     return msg;
 
 }
@@ -279,8 +281,8 @@ void printFrame (const char *prefix, FRAME *frame)
     }
     case RELAY:
     {
-        //printf("src= psw%d, dest= psw%d)  [RELAY]: header= (srcIP= %d, destIP= %d\n", 
-        //msg.pRelay.)
+        printf("src= psw%d, dest= psw%d)  [RELAY]: header= (srcIP= %d, destIP= %d\n", 
+        msg.pRelay.switchID, msg.pRelay.destSwitchID, msg.pRelay.srcIP, msg.pRelay.destIP);
     }
     default:
         break;
@@ -557,11 +559,11 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
                 // composeRelayMSg 
                 if (rule.actionVAL == 2) {
                     assert(fds[currSwitchID][currSwitchID + 1] > 0);
-                    sendmsg = composeRELAYmsg(frame);
+                    sendmsg = composeRELAYmsg(frame, currSwitchID);
                     sendFrame(fds[currSwitchID][currSwitchID + 1], RELAY, &sendmsg);
                 } else if (rule.actionVAL == 1) {
                     assert(fds[currSwitchID][currSwitchID - 1] > 0);
-                    sendmsg = composeRELAYmsg(frame);
+                    sendmsg = composeRELAYmsg(frame, currSwitchID);
                     sendFrame(fds[currSwitchID][currSwitchID - 1], RELAY, &sendmsg);
                 }
                 forwardTable[forwardTable.size() - 1].pktCount += 1;
@@ -639,7 +641,7 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
                     FRAME f1;
                     f1.msg = addmsg;
                     f1.kind = ADD;
-                    relaymsg = composeRELAYmsg(&f1);
+                    relaymsg = composeRELAYmsg(&f1, switchID);
                     if (forwardTable[i].actionVAL == 1) { // relay to port 1
                         sendFrame(fds[switchID][switchID - 1], RELAY, &relaymsg);
                     } else if (forwardTable[i].actionVAL == 2) {  // relay to port 2
