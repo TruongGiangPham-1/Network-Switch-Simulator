@@ -3,13 +3,12 @@
 #include <unistd.h>
 #include <signal.h>
 
-
-
 using namespace std;
-#define DELAY 4000  // 5s
-
+#define DELAY 2000  // 5s
+int timerflag = false;
 void timerHandler() {
     printf("int titi timer\n");
+    timerflag = true;
 }
 
 int main() {
@@ -31,7 +30,7 @@ int main() {
     }
 
     while (true) {
-
+        printf("timerflag = %d\n", timerflag);
     }
     return 0;
 }
