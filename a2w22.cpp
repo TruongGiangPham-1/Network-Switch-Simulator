@@ -430,7 +430,7 @@ void printInfoSwitch(vector<fTABLEROW>&forwardTable, SWITCH * sw) {
     printf("Forwarding table: \n");
     for (int i = 0; i < forwardTable.size(); i++) {
        // I realized i can just do %d-%d instead of above
-        printf("[%d] (scrIP= %d-%d, destIP= %d-%d, action=%s:%d, pktCount= %d\n",
+        printf("[%d] (scrIP= %d-%d, destIP= %d-%d, action=%s:%d, pktCount= %d)\n",
         i, forwardTable[i].scrIP_lo, forwardTable[i].scrIP_hi, forwardTable[i].destIP_lo, 
         forwardTable[i].destIP_hi, ACTIONNAME[forwardTable[i].ACTIONTYPE], forwardTable[i].actionVAL, 
         forwardTable[i].pktCount);
@@ -692,6 +692,7 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
         // send ask
         //printf("ASK send\n");
         MSG msg;
+        //printf("token1 [%s], token2[%s]\n", tokens[1].c_str(), tokens[2].c_str());
         msg = composeASKmsg(srcIP, destIP, switchID);
         sendFrame(fds[switchID][0], ASK, &msg);
         FRAME printASK;
@@ -856,7 +857,9 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         if (ADDreceived and canRead) { // only read more line if ADD received
             
             if(fgets(readbuff, MAXLINE, (FILE*) fp) != NULL) {
-                readbuff[strlen(readbuff) - 1] = '\0';  // ???
+                if (readbuff[strlen(readbuff) - 1] == '\n') {
+                    readbuff[strlen(readbuff) - 1] = '\0';  // ???
+                }
                 int ret = parseFileLine(readbuff, pSwitch->switchID, forwardTable, fds, pSwitch);
                 //printf("line 860, [%s]\n", readbuff);
                 if (ret == 1) {  // means that we sent ASK
