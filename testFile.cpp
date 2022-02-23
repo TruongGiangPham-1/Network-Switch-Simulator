@@ -48,6 +48,7 @@ void parseFileLine(char* readbuff, int switchID) {
     for (int i = 0; i < 3; i++) {
         token = strtok_r(theRest, " ", &theRest);
         string tok(token);
+        
         tokens.push_back(tok);
     }
     //printf("tokens[0][0] = [%c]\n", tokens[0][0]);
@@ -70,7 +71,7 @@ int main() {
 //    printKind(ADD);
 //    printKind(RELAY);
 //
-    const char* m = "datafile";
+    const char* m = "datafile1";
     string str = "./" + string(m);
     cout << str << endl;
     FILE* fp;

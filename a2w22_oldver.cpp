@@ -10,8 +10,6 @@
 #include <vector>
 #include <poll.h>
 #include <utility> // for PAIR
-#include <sys/time.h>  // for setitimer
-#include <signal.h>  // for signal()
 
 
 using namespace std;
@@ -21,7 +19,6 @@ using namespace std;
 #define MAX_SWITCH 7
 #define SWITCHPORTS_N 5
 #define MAXIP 1000
-int canRead = true; // flag for delay, if !canRead, we dont read from file
 
 typedef pair<int, int> PII; // PII = pair int int
 typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
@@ -74,7 +71,7 @@ typedef struct {
 } HELLO_PACK;
 
 typedef struct {
-    int destID;
+    int nothing;
 } HELLO_ACK_PACK;
 
 typedef struct {
@@ -90,11 +87,10 @@ typedef struct {
     int destIP_hi;
     tableACTION ACTIONTYPE;
     int actionVAL;
-    int currSwitchID; // id to switch that send ask
 } ADD_PACK;
 
 typedef struct {
-    int switchID;  // source switch id
+    int nothing;
     int destSwitchID; // assert(destSwithID == switchID of switch relayed to)
     int srcIP;  // not needed, but for error check
     int destIP;  // notneeded, but for error check
@@ -127,27 +123,7 @@ void WARNING (const char *fmt, ... )
     va_start (ap, fmt);  vfprintf (stderr, fmt, ap);  va_end(ap);
 }
 // ------------------------------
-// ALARM AND SIGNAL STUFF FOR DELAY AND SIGNAL
-void timerHandler() {
-    printf("\n");
-    printf("** Delay period ended\n");
-    printf("\n");
-    canRead = true; // set it to true so we can read it
-}
-void callTimer(int delay) {
-    struct itimerval timer;
-    // we dont want polling timer so dont trigger it periodically
-    timer.it_interval.tv_sec = 0;
-    timer.it_interval.tv_usec = 0;
-    //
-    timer.it_value.tv_sec = delay / 1000; // get sec component;
-    timer.it_value.tv_usec = (delay % 1000) * 1000; // microsec component
-    // total timer time = tv_sec + tv_usec
-    if (setitimer(ITIMER_REAL, &timer, NULL) == -1) {
-        perror("error calling setitimer()");
-        exit(1);
-    }
-}
+
 
 // ------------------------------
 MSG composeHELLOmsg (int switchID, int nNeighbor, int lowIP, int highIP, int pswj, int pswk)
@@ -164,26 +140,22 @@ MSG composeHELLOmsg (int switchID, int nNeighbor, int lowIP, int highIP, int psw
     return msg;
 }    
 // ------------------------------    
-MSG composeACKmsg (int destid)
+MSG composeACKmsg ()
 {
     MSG  msg;
     memset( (char *) &msg, 0, sizeof(msg) );
-    msg.pHelloAck.destID = destid; // dummy value
+    msg.pHelloAck.nothing = 0; // dummy value
     return msg;
 }    
 // ------------------------------
-MSG  composeADDmsg (int dest_lo, int dest_hi, tableACTION action, int actionVAL, int destSwitchID, int switchID)
+MSG  composeADDmsg (int dest_lo, int dest_hi, tableACTION action, int actionVAL, int destSwitchID)
 {
     MSG  msg;
-    //printf("in composeADD\n");
-    //printf("line 176\n");
     msg.pAdd.ACTIONTYPE = action;
     msg.pAdd.actionVAL = actionVAL;
     msg.pAdd.destIP_lo = dest_lo;
     msg.pAdd.destIP_hi = dest_hi;
     msg.pAdd.destSwitchID = destSwitchID;
-    msg.pAdd.currSwitchID = switchID;
-    //printf("line 183\n");
     return msg;
 }
 MSG composeASKmsg(int scrIP, int destIP, int switchID) {
@@ -194,15 +166,12 @@ MSG composeASKmsg(int scrIP, int destIP, int switchID) {
     return msg; 
 
 }
-MSG composeRELAYmsg(FRAME * frame, int switchID) {
+MSG composeRELAYmsg(FRAME * frame) {
     MSG msg;
     assert(frame->kind == ADD);
     assert((frame->msg).pAdd.ACTIONTYPE == FORWARD);
     assert((frame->msg).pAdd.actionVAL != 0);
     msg.pRelay.destSwitchID = (frame->msg).pAdd.destSwitchID; // 
-    msg.pRelay.switchID = switchID;
-    msg.pRelay.srcIP = (frame->msg).pAdd.destIP_lo;
-    msg.pRelay.destIP = (frame->msg).pAdd.destIP_hi;
     return msg;
 
 }
@@ -246,59 +215,28 @@ void printFrame (const char *prefix, FRAME *frame)
     {
     case HELLO/* constant-expression */:
         /* code */
-        {
-            //printf("switchID: [%d], nNeighbor: [%d], lowIP: [%d], highIP: [%d]\n", msg.pHello.switchNUM, msg.pHello.Nneighbor, 
-                //msg.pHello.lowIP, msg.pHello.highIP);
-            string port1Str;
-            string port2Str;
-            if (msg.pHello.pswj == -1) {
-                port1Str = "null";
-            } else {
-                port1Str = "psw" + to_string(msg.pHello.pswj);
-            }
-            if (msg.pHello.pswk == -1) {
-                port2Str = "null";
-            } else {
-                port2Str = "psw" + to_string(msg.pHello.pswk);
-            }
-            printf("(scr= psw%d, dest= master) [HELLO]:\n", msg.pHello.switchNUM);
-            printf("     (port0= master, port1=%s, port2=%s, port3=%d-%d\n", port1Str.c_str(), port2Str.c_str(),
-            msg.pHello.lowIP, msg.pHello.highIP);
-            break;
-        }
+        printf("switchID: [%d], nNeighbor: [%d], lowIP: [%d], highIP: [%d]\n", msg.pHello.switchNUM, msg.pHello.Nneighbor, 
+               msg.pHello.lowIP, msg.pHello.highIP);
+        break;
     case HELLO_ACK:
-        printf("(src= master, dest=psw%d) [HELLO_ACK]\n", msg.pHelloAck.destID);
+        printf("ACKED\n");
         break;
     case ASK:
     {
-        //printf("[ASK]: header= (srcIP= %d, destIP=%d)\n", msg.pAsk.scrIP, msg.pAsk.destIP);
-        printf("(scr=psw%d, dest= master) [ASK]: header= (srcIP= %d, destIP= %d)\n"
-        ,msg.pAsk.switchID, msg.pAsk.scrIP, msg.pAsk.destIP);
+        printf("[ASK]: header= (srcIP= %d, destIP=%d)\n", msg.pAsk.scrIP, msg.pAsk.destIP);
         break;
-
     }
     case ADD:
     {
-        //printf("[ADD]: (srcIP: 0-1000, destIP=%d-%d, action=%s:%d, pktCount= 0\n", 
-        //msg.pAdd.destIP_lo, msg.pAdd.destIP_hi, ACTIONNAME[msg.pAdd.ACTIONTYPE], msg.pAdd.actionVAL);
-        //printf("PRINTING ADD\n");
-        printf("(src= master, dest= psw%d) [ADD]:\n", msg.pAdd.currSwitchID);
-        printf(" scrIP=0-1000, destIP= %d-%d, action= %s:%d, pktCount=0\n", 
+        printf("[ADD]: (srcIP: 0-1000, destIP=%d-%d, action=%s:%d, pktCount= 0\n", 
         msg.pAdd.destIP_lo, msg.pAdd.destIP_hi, ACTIONNAME[msg.pAdd.ACTIONTYPE], msg.pAdd.actionVAL);
         break;
-    }
-    case RELAY:
-    {
-        printf("src= psw%d, dest= psw%d)  [RELAY]: header= (srcIP= %d, destIP= %d)\n", 
-        msg.pRelay.switchID, msg.pRelay.destSwitchID, msg.pRelay.srcIP, msg.pRelay.destIP);
     }
     default:
         break;
     }
     
 }
-
-
 // ------------------------------
 
 PII getLowIP_HighIP(const char * ips) {
@@ -486,13 +424,8 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
         {
             master->helloCount += 1;
             master->ackCount += 1;
-            msg = composeACKmsg((frame->msg).pHello.switchNUM);
+            msg = composeACKmsg();
             sendFrame(fd, HELLO_ACK, &msg);
-            FRAME fack;
-            fack.kind = HELLO_ACK;
-            fack.msg = msg;
-            printFrame("Transmitted  ", &fack);
-            printf("\n");
             SWITCH incomingSwitch = {
                 /*.switchID = */ (frame->msg).pHello.switchNUM,
                 /*.lowIP = */(frame->msg).pHello.lowIP,
@@ -518,31 +451,17 @@ void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERS
             }
             printf("before compose ADD \n");
             if ( switchIndex == -1) {  // no found == make DROP rule
-                //assert(sw->switchID > 0);  // segfault cuz sw is null
-                msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0, 0, (frame->msg).pAsk.switchID); // eg (0-1000, 300-300, DROP, 0)
+                msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0, 0); // eg (0-1000, 300-300, DROP, 0)
                 sendFrame(fd, ADD, &msg);
-                //printf("line 517\n");
-                FRAME fadd;
-                fadd.kind = ADD;
-                fadd.msg = msg;
-                printFrame("Transmitted  ", &fadd);
-                printf("\n");
-                //printf("line 522\n");
             } else {
-                //printf("line 527\n");
                 int currSwitchID = (frame->msg).pAsk.switchID;
                 int actionval = 1;  // initially set to port 1
                 if (currSwitchID < sArray[switchIndex].switchID) {
                     actionval = 2; // destSwitchID > currID so relay to port 2
                 }
                 msg = composeADDmsg(sArray[switchIndex].lowIP,sArray[switchIndex].highIP, FORWARD, actionval, 
-                sArray[switchIndex].switchID, (frame->msg).pAsk.switchID); 
+                sArray[switchIndex].switchID); 
                 sendFrame(fd, ADD, &msg);
-                FRAME fadd;
-                fadd.kind = ADD;
-                fadd.msg = msg;
-                printFrame("Transmitted  ", &fadd);
-                printf("\n");
             }
             master->ackCount +=1;
             master->addCount +=1;
@@ -566,7 +485,6 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
     case ADD:
         {
             // add to forwarding table
-            printf("\n");
             (pSwitch->nADDreceived) += 1;
             fTABLEROW rule = {
                 /* scrIP_lo*/ 0,
@@ -587,20 +505,12 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTa
                 // composeRelayMSg 
                 if (rule.actionVAL == 2) {
                     assert(fds[currSwitchID][currSwitchID + 1] > 0);
-                    sendmsg = composeRELAYmsg(frame, currSwitchID);
+                    sendmsg = composeRELAYmsg(frame);
                     sendFrame(fds[currSwitchID][currSwitchID + 1], RELAY, &sendmsg);
-                    //FRAME relayF;
-                    //relayF.msg = sendmsg;
-                    //relayF.kind = RELAY;
-                    //printFrame("Transmitted ", &relayF);
                 } else if (rule.actionVAL == 1) {
                     assert(fds[currSwitchID][currSwitchID - 1] > 0);
-                    sendmsg = composeRELAYmsg(frame, currSwitchID);
+                    sendmsg = composeRELAYmsg(frame);
                     sendFrame(fds[currSwitchID][currSwitchID - 1], RELAY, &sendmsg);
-                    //FRAME relayF;
-                    //relayF.msg = sendmsg;
-                    //relayF.kind = RELAY;
-                    //printFrame("Transmitted ", &relayF);
                 }
                 forwardTable[forwardTable.size() - 1].pktCount += 1;
                 pSwitch->nRelayout += 1;
@@ -666,7 +576,6 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
         for (int i = 0; i < forwardTable.size(); i++) {
             // assumes that lowip is within range
             if (forwardTable[i].destIP_lo <= destIP and destIP <= forwardTable[i].destIP_hi) {
-                //printf("ine 669\n");
                 forwardTable[i].pktCount += 1;
                 if (forwardTable[i].ACTIONTYPE == FORWARD and forwardTable[i].actionVAL != 3) {
                     // case: if we have to relay this packet to diff switch
@@ -674,41 +583,28 @@ int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, 
                     // send relay?
                     MSG addmsg;
                     MSG relaymsg;
-                    addmsg = composeADDmsg(srcIP, destIP, FORWARD, forwardTable[i].actionVAL, forwardTable[i].actionVAL, switchID);
+                    addmsg = composeADDmsg(0, 0, FORWARD, forwardTable[i].actionVAL, forwardTable[i].actionVAL);
                     FRAME f1;
                     f1.msg = addmsg;
                     f1.kind = ADD;
-                    relaymsg = composeRELAYmsg(&f1, switchID);
+                    relaymsg = composeRELAYmsg(&f1);
                     if (forwardTable[i].actionVAL == 1) { // relay to port 1
                         sendFrame(fds[switchID][switchID - 1], RELAY, &relaymsg);
                     } else if (forwardTable[i].actionVAL == 2) {  // relay to port 2
                         sendFrame(fds[switchID][switchID + 1], RELAY, &relaymsg);
                     }
-                    // print statement
+
                 }
                 return 2;
             } 
         }
         // send ask
-        //printf("ASK send\n");
+        printf("ASK send\n");
         MSG msg;
         msg = composeASKmsg(srcIP, destIP, switchID);
         sendFrame(fds[switchID][0], ASK, &msg);
-        FRAME printASK;
-        printASK.kind = ASK;
-        printASK.msg = msg;
-        printFrame("Transmitted  ", &printASK);
         return 1; 
         
-    }
-    if (tokens[0][3] == switchID_char and tokens[1] == "delay") {
-        // handle delay packet
-        int delay = stoi(tokens[2]);
-        callTimer(delay);
-        canRead = false;
-        printf("\n");
-        printf("**Entering a delay period of %d msec\n", delay);
-        printf("\n");
     }
     return 0;
 }
@@ -767,7 +663,6 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
 // pSwitch loop
 void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const char* datafile) {
     // establish connection with master/pswj/pswk
-    pollfd pollfds[SWITCHPORTS_N]; // = 5
     string fifo_i_master = getfifoName(pSwitch -> switchID, 0);
     string fifo_master_i = getfifoName(0, pSwitch->switchID);  // READ
     string fifo_i_j;
@@ -781,10 +676,10 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         fds[pSwitch->switchID][pSwitch->pswj] = openfifoWrite(fifo_i_j);
         assert(fds[pSwitch->switchID][pSwitch->pswj] > 0);
         assert(fds[pSwitch->pswj][pSwitch->switchID] > 0);
-        pollfds[1].fd = fds[pSwitch->pswj][pSwitch->switchID]; pollfds[1].events = POLLIN;
     } else {  // case: pswj is null
-        //fds[pSwitch->pswj][pSwitch->switchID] = -1;  // this shares memory with nASKswitch BECUASE its fds[-1][i]
-        pollfds[1].fd = -1;
+        printf("1hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
+        fds[pSwitch->pswj][pSwitch->switchID] = -1;  // this shares memory with nASKswitch
+        printf("2hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
     }
     if (pSwitch->pswk != -1) {
         fifo_i_k = getfifoName(pSwitch->switchID, pSwitch->pswk);
@@ -793,23 +688,24 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         fds[pSwitch->switchID][pSwitch->pswk] = openfifoWrite(fifo_i_k);
         assert(fds[pSwitch->switchID][pSwitch->pswk] > 0);
         assert(fds[pSwitch->pswk][pSwitch->switchID] > 0);
-        pollfds[2].fd = fds[pSwitch->pswk][pSwitch->switchID]; pollfds[2].events = POLLIN;
-        
     } else {  // case: pswk is null
-        //fds[pSwitch->pswk][pSwitch->switchID] = -1;
-        pollfds[2].fd = -1;
+        fds[pSwitch->pswk][pSwitch->switchID] = -1;
     }
     fds[0][pSwitch->switchID] = openfifoRead(fifo_master_i);
     fds[pSwitch->switchID][0] = openfifoWrite(fifo_i_master);
     
-    //pollfd pollfds[SWITCHPORTS_N]; // = 5
+    pollfd pollfds[SWITCHPORTS_N]; // = 5
     //pollfds[0] = fifo-0-i/master to pswi; pollfds[1]=port1l pollfds[2]=port2, pollfds[4] = keyboard
     pollfds[0].fd = fds[0][pSwitch->switchID]; pollfds[0].events = POLLIN; 
+    pollfds[1].fd = fds[pSwitch->pswj][pSwitch->switchID]; pollfds[1].events = POLLIN;
+    pollfds[2].fd = fds[pSwitch->pswk][pSwitch->switchID]; pollfds[2].events = POLLIN;
     pollfds[3].fd = -1;
     pollfds[4].fd = STDIN_FILENO; pollfds[4].events = POLLIN; pollfds[4].revents = 0;
     char readbuff[MAXLINE];
     char keyboardbuff[MAXLINE];
-
+    //memset(writebuff, 0, MAXWORD);
+    //strcpy(writebuff, "HELLO");
+    //write(fds[pSwitch->switchID][0], writebuff, MAXWORD);
     vector<fTABLEROW> forwardTable;
     fTABLEROW initialRule = {
     /* scrIP_lo*/ 0,
@@ -825,18 +721,11 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     MSG msg;
     msg = composeHELLOmsg(pSwitch->switchID, 0, pSwitch->lowIP, pSwitch->highIP, pSwitch->pswj, pSwitch->pswk);
     sendFrame(fds[pSwitch->switchID][0], HELLO, &msg);
-    // print 
-    FRAME printHel;
-    printHel.kind = HELLO;
-    printHel.msg = msg;
-    printFrame("Transmitted ", &printHel);
-    //
     int ackowledge = getACK(pollfds);
     assert(ackowledge == 1); // assert its ackolowdged
-    printf("\n");
     //printf("hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
-    (pSwitch->nHELLOtransm) += 1;
-    (pSwitch->nACKreceived) += 1;
+    (pSwitch->nHELLOtransm) = 1;
+    (pSwitch->nACKreceived) = 1;
     //printf("hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
     assert(pSwitch->nACKreceived > 0);
     assert(pSwitch->nHELLOtransm > 0);
@@ -853,12 +742,9 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     bool ADDreceived = true;
     while (true) {
         memset(readbuff, 0, MAXLINE);
-        if (ADDreceived and canRead) { // only read more line if ADD received
-            
+        if (ADDreceived) { // only read more line if ADD received
             if(fgets(readbuff, MAXLINE, (FILE*) fp) != NULL) {
-                readbuff[strlen(readbuff) - 1] = '\0';  // ???
                 int ret = parseFileLine(readbuff, pSwitch->switchID, forwardTable, fds, pSwitch);
-                //printf("line 860, [%s]\n", readbuff);
                 if (ret == 1) {  // means that we sent ASK
                     ADDreceived = false;
                     pSwitch->nASKtrans += 1;
@@ -872,15 +758,9 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         // todo; send HELLO and receive HELLO_ACK
         int pollret = poll(pollfds, SWITCHPORTS_N, 1);
         if (pollret < 0) {
-            if (errno == EINTR) {  // casued by SIGALARM to interupt poll
-                //cerr << "EINTR error while poll" << endl;
-                continue;
-            }
             cerr << "pollret returned -1" << endl;
-            //fprintf(stderr, "%s\n", explain_poll(pollfds, SWITCHPORTS_N, 1));
             exit(EXIT_FAILURE);
         }
-        //printf("reached after poll\n");
         // poll keyboard
         if (pollfds[4].revents and POLLIN) {
             memset(keyboardbuff, 0, MAXLINE);
@@ -909,11 +789,7 @@ int main(int argc, char *argv[]) {
     SWITCH pSwitch;
     MASTERSWITCH master;
     
-    // install signal handler
-    if (signal(SIGALRM, (void (*)(int))timerHandler) == SIG_ERR) {
-        perror("Unable to catch SIGALARM");
-        exit(1);
-    }
+    // parse the input 
     // open fifo
 
     if (argc == 3 and strcmp(argv[1], "master") == 0) {
