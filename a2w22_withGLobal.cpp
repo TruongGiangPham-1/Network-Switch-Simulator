@@ -445,6 +445,10 @@ void printInfoMaster() {
         printf("[psw %d] port1= %d, port2= %d, port3= %d-%d\n", 
             sArray[i].switchID, sArray[i].pswj, sArray[i].pswk, sArray[i].lowIP, sArray[i].highIP);
     }
+    printf("\n");
+    printf("Packet Stats:\n");
+    printf("       Received: HELLO:%d, ASK:%d\n", globalMaster.helloCount, globalMaster.askCount);
+    printf("       Transmitted: HELLO_ACK: %d, ADD:%d\n", globalMaster.ackCount, globalMaster.addCount);
     return;
 }
 void printInfoSwitch() {
@@ -574,7 +578,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, MASTERSWITCH * master, SWITCH *
                 printFrame("Transmitted  ", &fadd);
                 printf("\n");
             }
-            master->ackCount +=1;
+            master->askCount +=1;
             master->addCount +=1;
             break;
         }
