@@ -465,6 +465,10 @@ void parseKeyboardSwitch(const char* keyboardInput) {
         assert(forwardTable.size() > 0);
         //printf("reached parseKEyboarSwitch\n");
         printInfoSwitch();
+    } else if (strcmp(keyboardInput, "exit") == 0) {
+        assert(forwardTable.size() > 0);
+        printInfoSwitch();
+        exit(0);
     }
 }
 void parseKeyboardMaster(const char * keyboardInput) {
