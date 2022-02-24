@@ -36,6 +36,10 @@ void parseFileLine(char* readbuff, int switchID) {
         printf("emptyline, skipping\n");
         return;
     }
+
+
+
+
     vector<string>tokens;
     char readcopied[MAXLINE];
     char * token = NULL, *theRest = NULL;
@@ -70,7 +74,7 @@ int main() {
 //    printKind(ASK);
 //    printKind(ADD);
 //    printKind(RELAY);
-//
+
     const char* m = "ex3.dat";
     string str = "./" + string(m);
     cout << str << endl;
@@ -83,9 +87,9 @@ int main() {
     }
     memset(readbuff, 0, MAXLINE);
     while (fgets(readbuff, MAXLINE, (FILE*)fp) != NULL) {
-        if (readbuff[strlen(readbuff) - 1] == '\n') {
-            readbuff[strlen(readbuff) - 1] = '\0';
-        }
+        //if (readbuff[strlen(readbuff) - 1] == '\n') {
+        //    readbuff[strlen(readbuff) - 1] = '\0';
+        //}
         //printf("line:[%s]\n", readbuff);
         parseFileLine(readbuff, 1);
         memset(readbuff, 0, MAXLINE);
