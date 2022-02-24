@@ -28,11 +28,6 @@ typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
 char KINDNAME[][MAXWORD]= { "HELLO", "HELLO_ACK", "ASK", "ADD", "RELAY" };
 typedef enum {FORWARD, DROP} tableACTION;    // forward table action
 char ACTIONNAME[][MAXWORD] = {"FORWARD", "DROP"};
-// SOME FUNCTION DECLARATION
-void printInfoMaster();
-void printInfoSwitch();
-//
-
 typedef struct {  // each switch has vector of fTABLEROW
     int scrIP_lo;
     int scrIP_hi;
@@ -96,8 +91,6 @@ typedef struct {
     tableACTION ACTIONTYPE;
     int actionVAL;
     int currSwitchID; // id to switch that send ask
-    int asked_srcIP;  // for relay, they needed this for output
-    int asked_destIP; // for relay
 } ADD_PACK;
 
 typedef struct {
@@ -113,12 +106,7 @@ typedef union {HELLO_PACK pHello; HELLO_ACK_PACK pHelloAck; ASK_PACK pAsk; ADD_P
 
 typedef struct { KIND kind; MSG msg; } FRAME;
 
-vector<fTABLEROW> forwardTable;
-vector<SWITCH> sArray;
-MASTERSWITCH globalMaster;
-SWITCH globalSwitch;
-int isMaster = false; // indicate if this program is ran as master or switch
-int isSwitch = false; 
+
 // ------------------------------
 // The WARNING and FATAL functions are due to the authors of
 // the AWK Programming Language.
@@ -160,15 +148,7 @@ void callTimer(int delay) {
         exit(1);
     }
 }
-void USR1handler() {
-    if (isMaster) {
-        printf("SIGUSR1 detected.. printing Master info\n");
-        printInfoMaster();
-    } else if (isSwitch) {
-        printf("SIGUSR1 detected.. printing Switch info\n");
-        printInfoSwitch();
-    }
-}
+
 // ------------------------------
 MSG composeHELLOmsg (int switchID, int nNeighbor, int lowIP, int highIP, int pswj, int pswk)
 {
@@ -192,7 +172,7 @@ MSG composeACKmsg (int destid)
     return msg;
 }    
 // ------------------------------
-MSG  composeADDmsg (int dest_lo, int dest_hi, tableACTION action, int actionVAL, int destSwitchID, int switchID, int asked_srcIP, int asked_destIP)
+MSG  composeADDmsg (int dest_lo, int dest_hi, tableACTION action, int actionVAL, int destSwitchID, int switchID)
 {
     MSG  msg;
     //printf("in composeADD\n");
@@ -203,8 +183,6 @@ MSG  composeADDmsg (int dest_lo, int dest_hi, tableACTION action, int actionVAL,
     msg.pAdd.destIP_hi = dest_hi;
     msg.pAdd.destSwitchID = destSwitchID;
     msg.pAdd.currSwitchID = switchID;
-    msg.pAdd.asked_srcIP = asked_srcIP;
-    msg.pAdd.asked_destIP = asked_destIP;
     //printf("line 183\n");
     return msg;
 }
@@ -223,8 +201,8 @@ MSG composeRELAYmsg(FRAME * frame, int switchID) {
     assert((frame->msg).pAdd.actionVAL != 0);
     msg.pRelay.destSwitchID = (frame->msg).pAdd.destSwitchID; // 
     msg.pRelay.switchID = switchID;
-    msg.pRelay.srcIP = (frame->msg).pAdd.asked_srcIP;
-    msg.pRelay.destIP = (frame->msg).pAdd.asked_destIP;
+    msg.pRelay.srcIP = (frame->msg).pAdd.destIP_lo;
+    msg.pRelay.destIP = (frame->msg).pAdd.destIP_hi;
     return msg;
 
 }
@@ -435,7 +413,7 @@ int openfifoWrite(string name) {
     return fd;
 }
 // KEYBOARD ----------------------------------------------------------------
-void printInfoMaster() {
+void printInfoMaster(vector<SWITCH>&sArray) {
     // mode == master or switch
     assert(sArray.size() > 0);
     //printf("sArrap[0].highIP == %d\n", sArray[0].highIP); == -1 for somereason
@@ -445,13 +423,9 @@ void printInfoMaster() {
         printf("[psw %d] port1= %d, port2= %d, port3= %d-%d\n", 
             sArray[i].switchID, sArray[i].pswj, sArray[i].pswk, sArray[i].lowIP, sArray[i].highIP);
     }
-    printf("\n");
-    printf("Packet Stats:\n");
-    printf("       Received: HELLO:%d, ASK:%d\n", globalMaster.helloCount, globalMaster.askCount);
-    printf("       Transmitted: HELLO_ACK: %d, ADD:%d\n", globalMaster.ackCount, globalMaster.addCount);
     return;
 }
-void printInfoSwitch() {
+void printInfoSwitch(vector<fTABLEROW>&forwardTable, SWITCH * sw) {
     assert(forwardTable.size() > 0);
     printf("Forwarding table: \n");
     for (int i = 0; i < forwardTable.size(); i++) {
@@ -464,30 +438,22 @@ void printInfoSwitch() {
     printf("\n");
     printf("Packet Stats:\n");
     printf("Received: ADMIT: %d, HELLO_ACK: %d, ADD: %d, RELAYIN: %d\n", 
-    sArray[0].admit, sArray[0].nACKreceived, sArray[0].nADDreceived, sArray[0].nRELAYIN);
+    sw->admit, sw->nACKreceived, sw->nADDreceived, sw->nRELAYIN);
     printf("Transmitted: HELLO: %d, ASK: %d, RELAYOUT: %d\n", 
-    sArray[0].nHELLOtransm, sArray[0].nASKtrans, sArray[0].nRelayout); 
+    sw->nHELLOtransm, sw->nASKtrans, sw->nRelayout); 
 }
-void parseKeyboardSwitch(const char* keyboardInput) {
+void parseKeyboardSwitch(const char* keyboardInput, vector<fTABLEROW>&ftable, SWITCH *sw) {
     if (strcmp(keyboardInput, "info") == 0) {
-        assert(forwardTable.size() > 0);
+        assert(ftable.size() > 0);
         //printf("reached parseKEyboarSwitch\n");
-        printInfoSwitch();
-    } else if (strcmp(keyboardInput, "exit") == 0) {
-        assert(forwardTable.size() > 0);
-        printInfoSwitch();
-        exit(0);
+        printInfoSwitch(ftable, sw);
     }
 }
-void parseKeyboardMaster(const char * keyboardInput) {
+void parseKeyboardMaster(const char * keyboardInput, vector<SWITCH>&sArray) {
     // print stuff/
     if (strcmp(keyboardInput, "info") == 0) {
         assert(sArray.size() >= 1); // assert at least one switch exist
-        printInfoMaster();
-    } else if (strcmp(keyboardInput, "exit") == 0) {
-        assert(sArray.size() >= 1);
-        printInfoMaster();
-        exit(0);
+        printInfoMaster(sArray);
     } 
 }
 // --------------------------------------------------------------------------------
@@ -511,7 +477,7 @@ int getACK(pollfd * pollfds) {  // poll master until i get acknowledge
     return 0;
 }
 // ----------------------------------------------------------------------------------
-void parseAndSendToSwitch(int fd, FRAME * frame, MASTERSWITCH * master, SWITCH * sw) {
+void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERSWITCH * master, SWITCH * sw) {
     // parse Frame and send to fd // 
     MSG msg;
     switch (frame->kind)
@@ -553,7 +519,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, MASTERSWITCH * master, SWITCH *
             printf("before compose ADD \n");
             if ( switchIndex == -1) {  // no found == make DROP rule
                 //assert(sw->switchID > 0);  // segfault cuz sw is null
-                msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0, 0, (frame->msg).pAsk.switchID, 0, 0); // eg (0-1000, 300-300, DROP, 0)
+                msg = composeADDmsg(dIP_toASk, dIP_toASk, DROP, 0, 0, (frame->msg).pAsk.switchID); // eg (0-1000, 300-300, DROP, 0)
                 sendFrame(fd, ADD, &msg);
                 //printf("line 517\n");
                 FRAME fadd;
@@ -570,7 +536,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, MASTERSWITCH * master, SWITCH *
                     actionval = 2; // destSwitchID > currID so relay to port 2
                 }
                 msg = composeADDmsg(sArray[switchIndex].lowIP,sArray[switchIndex].highIP, FORWARD, actionval, 
-                sArray[switchIndex].switchID, (frame->msg).pAsk.switchID, (frame->msg).pAsk.scrIP, (frame->msg).pAsk.destIP); 
+                sArray[switchIndex].switchID, (frame->msg).pAsk.switchID); 
                 sendFrame(fd, ADD, &msg);
                 FRAME fadd;
                 fadd.kind = ADD;
@@ -578,7 +544,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, MASTERSWITCH * master, SWITCH *
                 printFrame("Transmitted  ", &fadd);
                 printf("\n");
             }
-            master->askCount +=1;
+            master->ackCount +=1;
             master->addCount +=1;
             break;
         }
@@ -591,7 +557,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, MASTERSWITCH * master, SWITCH *
         break;
     }
 }
-void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], SWITCH * pSwitch) {
+void parseSwitchMSG(int currSwitchID, FRAME * frame, vector<fTABLEROW>&forwardTable, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], SWITCH * pSwitch) {
     MSG msg;
     msg = frame->msg;
     MSG sendmsg;
@@ -660,7 +626,7 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_
     }
 }
 // --------------------------------------------------------------------------------------
-int parseFileLine(char* readbuff, int switchID, int fds[8][8], SWITCH*pswitch) {
+int parseFileLine(char* readbuff, int switchID, vector<fTABLEROW>&forwardTable, int fds[8][8], SWITCH*pswitch) {
     if (readbuff[0] == '#') {
         //printf("# so skipp\n");
         return 0;
@@ -708,7 +674,7 @@ int parseFileLine(char* readbuff, int switchID, int fds[8][8], SWITCH*pswitch) {
                     // send relay?
                     MSG addmsg;
                     MSG relaymsg;
-                    addmsg = composeADDmsg(srcIP, destIP, FORWARD, forwardTable[i].actionVAL, forwardTable[i].actionVAL, switchID, srcIP, destIP);
+                    addmsg = composeADDmsg(srcIP, destIP, FORWARD, forwardTable[i].actionVAL, forwardTable[i].actionVAL, switchID);
                     FRAME f1;
                     f1.msg = addmsg;
                     f1.kind = ADD;
@@ -770,7 +736,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
     // 1. poll, if pollfd.fd = -1, poll() will ignore; revent = 0;
     MSG msg;
     FRAME frame;
-    //vector<SWITCH> sArray;
+    vector<SWITCH> sArray;
     printf("established file descriptors, waiting for HELLO\n");
     while (true) {
         //updateFDs();
@@ -778,10 +744,6 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
         int pollret = poll(pollfds, nswitch_ + 1, 1); // 
         //cout << "pollred " << pollret << endl;
         if (pollret < 0) {
-            if (errno == EINTR) {  // casued by SIGALARM to interupt poll
-                //cerr << "EINTR error while poll" << endl;
-                continue;
-            }
             cerr << "polling returned -1" << endl;
             exit(EXIT_FAILURE);
         }
@@ -789,7 +751,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
             memset(readbuff, 0, MAXWORD);
             int bytesread = read(pollfds[0].fd, readbuff, MAXWORD); // theres a \n character
             readbuff[strlen(readbuff) - 1] = '\0';  // clear \n character
-            parseKeyboardMaster(readbuff);
+            parseKeyboardMaster(readbuff, sArray);
         }
         for (int i = 1; i < nswitch_ + 1; i++) {
             if (pollfds[i].revents and POLLIN) {
@@ -797,7 +759,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
                 if (pollfds[i].fd == -1) continue; // other end closed pipe so rcvFrame() changed fd to -1
                 printFrame("recieved ", &frame); 
-                parseAndSendToSwitch(fds[0][i], &frame, masterswitch, nullptr);
+                parseAndSendToSwitch(fds[0][i], &frame, sArray, masterswitch, nullptr);
                 pollfds[i].revents = 0;
             }
         }
@@ -849,7 +811,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     char readbuff[MAXLINE];
     char keyboardbuff[MAXLINE];
 
-    //vector<fTABLEROW> forwardTable;
+    vector<fTABLEROW> forwardTable;
     fTABLEROW initialRule = {
     /* scrIP_lo*/ 0,
     /* scrIP_hi */ MAXIP,
@@ -898,7 +860,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
                 if (readbuff[strlen(readbuff) - 1] == '\n') {
                     readbuff[strlen(readbuff) - 1] = '\0';  // ???
                 }
-                int ret = parseFileLine(readbuff, pSwitch->switchID, fds, pSwitch);
+                int ret = parseFileLine(readbuff, pSwitch->switchID, forwardTable, fds, pSwitch);
                 //printf("line 860, [%s]\n", readbuff);
                 if (ret == 1) {  // means that we sent ASK
                     ADDreceived = false;
@@ -928,7 +890,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
             int bytesread = read(pollfds[4].fd, keyboardbuff, MAXLINE);
             keyboardbuff[strlen(keyboardbuff) - 1] = '\0';
             assert(bytesread > 0);
-            parseKeyboardSwitch(keyboardbuff);
+            parseKeyboardSwitch(keyboardbuff, forwardTable, pSwitch);
         } 
       
         for (int i = 0; i < SWITCHPORTS_N - 2; i++) {  // check everything exept keyboard[0 - 3] and port 3
@@ -937,14 +899,13 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
                 if (pollfds[i].fd == -1) continue; //closed
                 printFrame("recieved ", &frame);  
                 if (frame.kind == ADD) ADDreceived = true;
-                parseSwitchMSG(pSwitch->switchID, &frame, fds, pSwitch);
+                parseSwitchMSG(pSwitch->switchID, &frame, forwardTable, fds, pSwitch);
             }
         }
     } 
 }
 // ----------------------------------------------------------------------------------
 int main(int argc, char *argv[]) {
-    printf("PID=%d\n", getpid());
     char tokens[10][MAXWORD];
     int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]; //fds[i][j] means fd for fifo-i-j
     
@@ -956,27 +917,20 @@ int main(int argc, char *argv[]) {
         perror("Unable to catch SIGALARM");
         exit(1);
     }
-    if (signal(SIGUSR1, (void (*)(int))USR1handler) == SIG_ERR) {
-        perror("Unable to catch SIGUSR1");
-        exit(1);
-    }
     // open fifo
 
     if (argc == 3 and strcmp(argv[1], "master") == 0) {
         // master switch
-        isMaster = true;
         for (int i = 1; i < 3; i++) {
             strcpy(tokens[i - 1], argv[i]);
             // tokens[0] = "master"
             // tokens[1] = "nSwitch"
             //do_master();
         }
-        //populateMaster(&master, tokens);
-        populateMaster(&globalMaster, tokens);
-        do_master(&globalMaster, fds);
+        populateMaster(&master, tokens);
+        do_master(&master, fds);
     } else if (argc == 6) {  // SWTICH PERSPECTIVE
         // pswi switch, TODO: error check argument
-        isSwitch = true;
         for (int i = 1; i < 6; i++) {
             memset(tokens[i - 1], 0, MAXWORD); 
             strcpy(tokens[i - 1], argv[i]);
@@ -986,11 +940,9 @@ int main(int argc, char *argv[]) {
             // tokens[3] = "null/pswk"
             // tokens[4] = "IPlow-IPhigh"
         }
-        sArray.push_back(pSwitch);
-        //populateSwitch(&pSwitch, tokens);
-        populateSwitch(&sArray[0], tokens);
-        //do_switch(&pSwitch, fds, tokens[1]);
-        do_switch(&sArray[0], fds, tokens[1]);
+        populateSwitch(&pSwitch, tokens);
+        //printSwitch(&pSwitch);  
+        do_switch(&pSwitch, fds, tokens[1]);
     } else {
         printf("invalid arguments\n");
         return 0;
