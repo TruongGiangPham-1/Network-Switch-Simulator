@@ -20,11 +20,18 @@ using namespace std;
 #define SWITCHPORTS_N 5
 #define DELAY 2000  // 5s
 
+vector<int>v;
 
 int canRead = true;
 void timerHandler() {
     printf("timer done\n");
     canRead = true;  // set it true so we can read it
+}
+void USR1Handler() {
+    printf("in USR!handler\n");
+    for (int i = 0; i < v.size(); i++) {
+        printf("%d\n", v[i]);
+    }
 }
 
 void calltimer(int delay) {
@@ -82,13 +89,16 @@ void parseFileLine(char* readbuff, int switchID) {
 
 }
 int main() {
+    v.push_back(1);
+    v.push_back(2);
     struct itimerval timer;
     if (signal(SIGALRM, (void (*)(int))timerHandler) == SIG_ERR) {
         perror("Unable to catch SIGALARM");
         exit(1);
     }
-
-
+    if (signal(SIGUSR1, (void (*)(int))USR1Handler) == SIG_ERR) {
+        perror("Unable to catch SIGURS1");
+    }
     const char* m = "ex3.dat";
     string str = "./" + string(m);
 
@@ -100,6 +110,11 @@ int main() {
         exit(1);
     }
     memset(readbuff, 0, MAXLINE);
+    while (true) {
+        // loop to catch usr1
+        printf("pid is %d\n", getpid());
+        sleep(2);
+    }
     while (true) {
         if (!canRead) {  // if canRead = false we skip
             continue;  

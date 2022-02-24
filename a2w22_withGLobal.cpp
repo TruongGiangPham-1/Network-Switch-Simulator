@@ -108,6 +108,8 @@ typedef struct { KIND kind; MSG msg; } FRAME;
 
 vector<fTABLEROW> forwardTable;
 vector<SWITCH> sArray;
+MASTERSWITCH globalMaster;
+SWITCH globalSwitch;
 // ------------------------------
 // The WARNING and FATAL functions are due to the authors of
 // the AWK Programming Language.
@@ -426,7 +428,7 @@ void printInfoMaster() {
     }
     return;
 }
-void printInfoSwitch(SWITCH * sw) {
+void printInfoSwitch() {
     assert(forwardTable.size() > 0);
     printf("Forwarding table: \n");
     for (int i = 0; i < forwardTable.size(); i++) {
@@ -439,15 +441,15 @@ void printInfoSwitch(SWITCH * sw) {
     printf("\n");
     printf("Packet Stats:\n");
     printf("Received: ADMIT: %d, HELLO_ACK: %d, ADD: %d, RELAYIN: %d\n", 
-    sw->admit, sw->nACKreceived, sw->nADDreceived, sw->nRELAYIN);
+    sArray[0].admit, sArray[0].nACKreceived, sArray[0].nADDreceived, sArray[0].nRELAYIN);
     printf("Transmitted: HELLO: %d, ASK: %d, RELAYOUT: %d\n", 
-    sw->nHELLOtransm, sw->nASKtrans, sw->nRelayout); 
+    sArray[0].nHELLOtransm, sArray[0].nASKtrans, sArray[0].nRelayout); 
 }
-void parseKeyboardSwitch(const char* keyboardInput, SWITCH *sw) {
+void parseKeyboardSwitch(const char* keyboardInput) {
     if (strcmp(keyboardInput, "info") == 0) {
         assert(forwardTable.size() > 0);
         //printf("reached parseKEyboarSwitch\n");
-        printInfoSwitch(sw);
+        printInfoSwitch();
     }
 }
 void parseKeyboardMaster(const char * keyboardInput) {
@@ -891,7 +893,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
             int bytesread = read(pollfds[4].fd, keyboardbuff, MAXLINE);
             keyboardbuff[strlen(keyboardbuff) - 1] = '\0';
             assert(bytesread > 0);
-            parseKeyboardSwitch(keyboardbuff,  pSwitch);
+            parseKeyboardSwitch(keyboardbuff);
         } 
       
         for (int i = 0; i < SWITCHPORTS_N - 2; i++) {  // check everything exept keyboard[0 - 3] and port 3
@@ -928,8 +930,9 @@ int main(int argc, char *argv[]) {
             // tokens[1] = "nSwitch"
             //do_master();
         }
-        populateMaster(&master, tokens);
-        do_master(&master, fds);
+        //populateMaster(&master, tokens);
+        populateMaster(&globalMaster, tokens);
+        do_master(&globalMaster, fds);
     } else if (argc == 6) {  // SWTICH PERSPECTIVE
         // pswi switch, TODO: error check argument
         for (int i = 1; i < 6; i++) {
@@ -941,9 +944,11 @@ int main(int argc, char *argv[]) {
             // tokens[3] = "null/pswk"
             // tokens[4] = "IPlow-IPhigh"
         }
-        populateSwitch(&pSwitch, tokens);
-        //printSwitch(&pSwitch);  
-        do_switch(&pSwitch, fds, tokens[1]);
+        sArray.push_back(pSwitch);
+        //populateSwitch(&pSwitch, tokens);
+        populateSwitch(&sArray[0], tokens);
+        //do_switch(&pSwitch, fds, tokens[1]);
+        do_switch(&sArray[0], fds, tokens[1]);
     } else {
         printf("invalid arguments\n");
         return 0;
