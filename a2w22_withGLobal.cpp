@@ -28,6 +28,11 @@ typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
 char KINDNAME[][MAXWORD]= { "HELLO", "HELLO_ACK", "ASK", "ADD", "RELAY" };
 typedef enum {FORWARD, DROP} tableACTION;    // forward table action
 char ACTIONNAME[][MAXWORD] = {"FORWARD", "DROP"};
+// SOME FUNCTION DECLARATION
+void printInfoMaster();
+void printInfoSwitch();
+//
+
 typedef struct {  // each switch has vector of fTABLEROW
     int scrIP_lo;
     int scrIP_hi;
@@ -110,6 +115,8 @@ vector<fTABLEROW> forwardTable;
 vector<SWITCH> sArray;
 MASTERSWITCH globalMaster;
 SWITCH globalSwitch;
+int isMaster = false; // indicate if this program is ran as master or switch
+int isSwitch = false; 
 // ------------------------------
 // The WARNING and FATAL functions are due to the authors of
 // the AWK Programming Language.
@@ -151,7 +158,15 @@ void callTimer(int delay) {
         exit(1);
     }
 }
-
+void USR1handler() {
+    if (isMaster) {
+        printf("SIGUSR1 detected.. printing Master info\n");
+        printInfoMaster();
+    } else if (isSwitch) {
+        printf("SIGUSR1 detected.. printing Switch info\n");
+        printInfoSwitch();
+    }
+}
 // ------------------------------
 MSG composeHELLOmsg (int switchID, int nNeighbor, int lowIP, int highIP, int pswj, int pswk)
 {
@@ -747,6 +762,10 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
         int pollret = poll(pollfds, nswitch_ + 1, 1); // 
         //cout << "pollred " << pollret << endl;
         if (pollret < 0) {
+            if (errno == EINTR) {  // casued by SIGALARM to interupt poll
+                //cerr << "EINTR error while poll" << endl;
+                continue;
+            }
             cerr << "polling returned -1" << endl;
             exit(EXIT_FAILURE);
         }
@@ -909,6 +928,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
 }
 // ----------------------------------------------------------------------------------
 int main(int argc, char *argv[]) {
+    printf("PID=%d\n", getpid());
     char tokens[10][MAXWORD];
     int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]; //fds[i][j] means fd for fifo-i-j
     
@@ -920,10 +940,15 @@ int main(int argc, char *argv[]) {
         perror("Unable to catch SIGALARM");
         exit(1);
     }
+    if (signal(SIGUSR1, (void (*)(int))USR1handler) == SIG_ERR) {
+        perror("Unable to catch SIGUSR1");
+        exit(1);
+    }
     // open fifo
 
     if (argc == 3 and strcmp(argv[1], "master") == 0) {
         // master switch
+        isMaster = true;
         for (int i = 1; i < 3; i++) {
             strcpy(tokens[i - 1], argv[i]);
             // tokens[0] = "master"
@@ -935,6 +960,7 @@ int main(int argc, char *argv[]) {
         do_master(&globalMaster, fds);
     } else if (argc == 6) {  // SWTICH PERSPECTIVE
         // pswi switch, TODO: error check argument
+        isSwitch = true;
         for (int i = 1; i < 6; i++) {
             memset(tokens[i - 1], 0, MAXWORD); 
             strcpy(tokens[i - 1], argv[i]);
