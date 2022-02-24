@@ -107,6 +107,7 @@ typedef union {HELLO_PACK pHello; HELLO_ACK_PACK pHelloAck; ASK_PACK pAsk; ADD_P
 typedef struct { KIND kind; MSG msg; } FRAME;
 
 vector<fTABLEROW> forwardTable;
+vector<SWITCH> sArray;
 // ------------------------------
 // The WARNING and FATAL functions are due to the authors of
 // the AWK Programming Language.
@@ -413,7 +414,7 @@ int openfifoWrite(string name) {
     return fd;
 }
 // KEYBOARD ----------------------------------------------------------------
-void printInfoMaster(vector<SWITCH>&sArray) {
+void printInfoMaster() {
     // mode == master or switch
     assert(sArray.size() > 0);
     //printf("sArrap[0].highIP == %d\n", sArray[0].highIP); == -1 for somereason
@@ -449,11 +450,11 @@ void parseKeyboardSwitch(const char* keyboardInput, SWITCH *sw) {
         printInfoSwitch(sw);
     }
 }
-void parseKeyboardMaster(const char * keyboardInput, vector<SWITCH>&sArray) {
+void parseKeyboardMaster(const char * keyboardInput) {
     // print stuff/
     if (strcmp(keyboardInput, "info") == 0) {
         assert(sArray.size() >= 1); // assert at least one switch exist
-        printInfoMaster(sArray);
+        printInfoMaster();
     } 
 }
 // --------------------------------------------------------------------------------
@@ -477,7 +478,7 @@ int getACK(pollfd * pollfds) {  // poll master until i get acknowledge
     return 0;
 }
 // ----------------------------------------------------------------------------------
-void parseAndSendToSwitch(int fd, FRAME * frame, vector<SWITCH>& sArray, MASTERSWITCH * master, SWITCH * sw) {
+void parseAndSendToSwitch(int fd, FRAME * frame, MASTERSWITCH * master, SWITCH * sw) {
     // parse Frame and send to fd // 
     MSG msg;
     switch (frame->kind)
@@ -736,7 +737,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
     // 1. poll, if pollfd.fd = -1, poll() will ignore; revent = 0;
     MSG msg;
     FRAME frame;
-    vector<SWITCH> sArray;
+    //vector<SWITCH> sArray;
     printf("established file descriptors, waiting for HELLO\n");
     while (true) {
         //updateFDs();
@@ -751,7 +752,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
             memset(readbuff, 0, MAXWORD);
             int bytesread = read(pollfds[0].fd, readbuff, MAXWORD); // theres a \n character
             readbuff[strlen(readbuff) - 1] = '\0';  // clear \n character
-            parseKeyboardMaster(readbuff, sArray);
+            parseKeyboardMaster(readbuff);
         }
         for (int i = 1; i < nswitch_ + 1; i++) {
             if (pollfds[i].revents and POLLIN) {
@@ -759,7 +760,7 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
                 if (pollfds[i].fd == -1) continue; // other end closed pipe so rcvFrame() changed fd to -1
                 printFrame("recieved ", &frame); 
-                parseAndSendToSwitch(fds[0][i], &frame, sArray, masterswitch, nullptr);
+                parseAndSendToSwitch(fds[0][i], &frame, masterswitch, nullptr);
                 pollfds[i].revents = 0;
             }
         }
