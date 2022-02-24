@@ -476,6 +476,10 @@ void parseKeyboardMaster(const char * keyboardInput) {
     if (strcmp(keyboardInput, "info") == 0) {
         assert(sArray.size() >= 1); // assert at least one switch exist
         printInfoMaster();
+    } else if (strcmp(keyboardInput, "exit") == 0) {
+        assert(sArray.size() >= 1);
+        printInfoMaster();
+        exit(0);
     } 
 }
 // --------------------------------------------------------------------------------
