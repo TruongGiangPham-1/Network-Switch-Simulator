@@ -135,11 +135,11 @@ typedef union {HELLO_PACK pHello; HELLO_ACK_PACK pHelloAck; ASK_PACK pAsk; ADD_P
 typedef struct { KIND kind; MSG msg; } FRAME;
 
 vector<fTABLEROW> forwardTable;
-vector<SWITCH> sArray;
-MASTERSWITCH globalMaster;
+vector<SWITCH> sArray;   // Array of SWITCH for master to keep track of 
+MASTERSWITCH globalMaster;  // made this global becuase signal handler could not pass argument
 SWITCH globalSwitch;
-int isMaster = false; // indicate if this program is ran as master or switch
-int isSwitch = false; 
+int isMaster = false;  // indicate if this program is ran as master
+int isSwitch = false;  // indicat if this program is ran as switch
 // ------------------------------
 // The WARNING and FATAL functions are due to the authors of
 // the AWK Programming Language.
@@ -165,7 +165,7 @@ void timerHandler() {
     printf("\n");
     printf("** Delay period ended\n");
     printf("\n");
-    canRead = true; // set it to true so we can read it
+    canRead = true; // set it to true so we can read from file
 }
 void callTimer(int delay) {
     struct itimerval timer;
@@ -263,7 +263,7 @@ void sendFrame (int fd, KIND kind, MSG *msg)
 }
 /* 
 rcvFrame: c379 lab3 functions, but I modifed it for my need
-          it now changes a pollfd fd to -1 if the otherside closes fd
+          it now changes a pollfd fd to -1 if the otherside closed fd
 */
 FRAME rcvFrame (int fd, struct pollfd* pollfds, int index)
 {
@@ -379,19 +379,6 @@ PII getLowIP_HighIP(const char * ips) {
     return p;
 }
 
-void printToken(char tokens[][MAXWORD], int len) {
-    for (int i = 0; i < len; i++) {
-        printf("argument %d: %s\n", i, tokens[i]);
-    }
-}
-
-void printSwitch(SWITCH* pSwitch) {
-    printf("switchID: %d\n", pSwitch -> switchID);
-    printf("lowIP: %d\n", pSwitch -> lowIP);
-    printf("highIP: %d\n", pSwitch -> highIP);
-    printf("pswj: %d\n", pSwitch -> pswj);
-    printf("pswk: %d\n", pSwitch -> pswk);
-}
 
 /* 
 PopulateSwitch: PARSE command arguments AND POPULATE SWITCH(for switch)
