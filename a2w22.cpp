@@ -624,8 +624,7 @@ void parseAndSendToSwitch(int fd, FRAME * frame, MASTERSWITCH * master, SWITCH *
                 /*.pswj = */ (frame->msg).pHello.pswj,
                 /*.pswk =*/ (frame->msg).pHello.pswk,
             };
-            //printf("[adding switch] switchID[%d], highIP[%d]", (frame->msg).pHello.switchNUM, (frame->msg).pHello.highIP);
-            sArray.push_back(incomingSwitch);
+            sArray.push_back(incomingSwitch);  // add the incoming switch to switch array
             break;
         }
     case ASK:  // compose ADD_PACK
@@ -651,9 +650,8 @@ void parseAndSendToSwitch(int fd, FRAME * frame, MASTERSWITCH * master, SWITCH *
                 fadd.msg = msg;
                 printFrame("Transmitted  ", &fadd);
                 printf("\n");
-                //printf("line 522\n");
             } else {
-                //printf("line 527\n");
+                // case: compose FORWARD ADD pack
                 int currSwitchID = (frame->msg).pAsk.switchID;
                 int actionval = 1;  // initially set to port 1
                 if (currSwitchID < sArray[switchIndex].switchID) {
