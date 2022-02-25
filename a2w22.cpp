@@ -1,3 +1,24 @@
+
+/*
+# ------------------------------
+# a2w22.cpp -- A2 program for 379
+#     This file includes the following:
+#     - Functions WARNING and FATAL that can be used to report warnings and
+#       errors after system calls
+#     -Functions timerHander() and USR1handler() to handler SIGARM and SIGUSR1 respectively.
+#     -Functions that compose HELLO/ACK/ADD/ASK/RELAY packages
+#     -sendFrame() and rcvframe() to communicate using fifos
+#     -a function printFrame that prints msgs from fifo
+#     - and much more
+#    
+#  Compile with:  g++ a2w22.cpp -o a2w22         (no check for warnings)
+#		  g++ -g a2w22.cpp -o a2w22   (for debugging with gdb)
+#
+#  Usage:  starter  stringArg  intArg	 (e.g., starter abcd 100)
+#
+#  Author: Truong-Giang Pham (for CMPUT 379, U. of Alberta)
+# ------------------------------
+*/
 #include <iostream>
 #include <unistd.h> 
 #include <stdarg.h> 
@@ -139,7 +160,7 @@ void WARNING (const char *fmt, ... )
     va_start (ap, fmt);  vfprintf (stderr, fmt, ap);  va_end(ap);
 }
 // ------------------------------
-// ALARM AND SIGNAL STUFF FOR DELAY AND SIGNAL
+// ALARM AND SIGNAL STUFF FOR DELAY AND SIGUSR1 implementation
 void timerHandler() {
     printf("\n");
     printf("** Delay period ended\n");
@@ -183,7 +204,6 @@ MSG composeHELLOmsg (int switchID, int nNeighbor, int lowIP, int highIP, int psw
     msg.pHello.pswk = pswk;
     return msg;
 }    
-// ------------------------------    
 MSG composeACKmsg (int destid)
 {
     MSG  msg;
@@ -191,7 +211,6 @@ MSG composeACKmsg (int destid)
     msg.pHelloAck.destID = destid; // dummy value
     return msg;
 }    
-// ------------------------------
 MSG  composeADDmsg (int dest_lo, int dest_hi, tableACTION action, int actionVAL, int destSwitchID, int switchID, int asked_srcIP, int asked_destIP)
 {
     MSG  msg;
@@ -229,6 +248,9 @@ MSG composeRELAYmsg(FRAME * frame, int switchID) {
 
 }
 // ----------------------------
+/*
+sendFrame: c379 lab3 functions that send Frame to fifo
+*/
 void sendFrame (int fd, KIND kind, MSG *msg)
 {
     FRAME  frame;
@@ -239,7 +261,10 @@ void sendFrame (int fd, KIND kind, MSG *msg)
     frame.msg=  *msg;
     write (fd, (char *) &frame, sizeof(frame));
 }
-
+/* 
+rcvFrame: c379 lab3 functions, but I modifed it for my need
+          it now changes a pollfd fd to -1 if the otherside closes fd
+*/
 FRAME rcvFrame (int fd, struct pollfd* pollfds, int index)
 {
     int    len; 
@@ -251,7 +276,7 @@ FRAME rcvFrame (int fd, struct pollfd* pollfds, int index)
     if (len != sizeof(frame))
         WARNING ("Received frame has length= %d (expected= %d)\n",
 		  len, sizeof(frame));
-    if (len == 0) {
+    if (len == 0) {  // ** MY EDIT
         pollfds[index].fd = -1; // means that othe end have closed pipe 
     }
     return frame;		  
@@ -259,6 +284,9 @@ FRAME rcvFrame (int fd, struct pollfd* pollfds, int index)
   
       
 // ------------------------------
+/* 
+printFrame: prints FRAME that matches sample output
+*/
 void printFrame (const char *prefix, FRAME *frame)
 {
     // prefix = "received"
@@ -322,7 +350,12 @@ void printFrame (const char *prefix, FRAME *frame)
 
 
 // ------------------------------
-
+/* 
+getLowIP_HighIP: parse low/high ip from program argument(for switch)
+Argument: ips - "lowip-higip" form argument when running as switch
+Returns: 
+    -a pair<int, int> = (lowip, highip)
+*/
 PII getLowIP_HighIP(const char * ips) {
     // ips = "lowip=highip"
     int IPstrLen = strlen(ips);
