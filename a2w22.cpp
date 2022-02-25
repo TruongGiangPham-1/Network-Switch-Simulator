@@ -393,11 +393,12 @@ void printSwitch(SWITCH* pSwitch) {
     printf("pswk: %d\n", pSwitch -> pswk);
 }
 
-// EXIT IF INCORRECT ARGUMENT
-int checkArgument() {
-    return 5;
-}
-// PARSE TOKEN AND POPULATE SWITCH
+/* 
+PopulateSwitch: PARSE command arguments AND POPULATE SWITCH(for switch)
+Argument:
+    -pSwitch: structure that represent a Switch
+    -tokens: tokenized commanline arguments
+*/
 void populateSwitch(SWITCH * pSwitch, char tokens[][MAXWORD]) {
     //https://stackoverflow.com/questions/5029840/convert-char-to-int-in-c-and-c
     pSwitch -> switchID = tokens[0][3] - '0'; // eg: '1' - '0' = int 
@@ -427,7 +428,11 @@ void populateSwitch(SWITCH * pSwitch, char tokens[][MAXWORD]) {
 }
 
 
-// POPULATE MASTER SWITCH STRUCT
+/* populateMaster: POPULATE MASTER SWITCH STRUCT (for master)
+Argument: 
+    -master: struct that represent master
+    -token: tokenized commandline argument 
+*/
 void populateMaster(MASTERSWITCH * master, char token[][MAXWORD]) {
     char tempStr[MAXWORD];
     memset(tempStr, 0, MAXWORD);
@@ -440,11 +445,21 @@ void populateMaster(MASTERSWITCH * master, char token[][MAXWORD]) {
     master->helloCount = 0;
 }
 
+/* 
+getfifoName: returns fifo name;
+*/
 string getfifoName(int x, int y) {
     string name = "fifo-" + to_string(x) + "-" + to_string(y);
     return name;
 }
 
+/* 
+openfifoRead: open fifo to read, none block
+argument:
+    -name: fifoname
+return:
+    -fd
+*/
 int openfifoRead(string name) {
     string fifoname = "./" + name;
     int fd = open(fifoname.c_str(), O_RDONLY | O_NONBLOCK); // this will block under other side is established
@@ -456,6 +471,15 @@ int openfifoRead(string name) {
 
     return fd;   
 }
+
+/* 
+openfifoWrite: open fifo to write, none block
+argument:
+    -name: fifoname
+return:
+    -fd
+*/
+
 int openfifoWrite(string name) {
     string fifoname = "./" + name;
 //https://stackoverflow.com/questions/580013/how-do-i-perform-a-non-blocking-fopen-on-a-named-pipe-mkfifo
@@ -468,6 +492,9 @@ int openfifoWrite(string name) {
     return fd;
 }
 // KEYBOARD ----------------------------------------------------------------
+/* 
+print master info
+*/
 void printInfoMaster() {
     // mode == master or switch
     assert(sArray.size() > 0);
@@ -484,6 +511,10 @@ void printInfoMaster() {
     printf("       Transmitted: HELLO_ACK: %d, ADD:%d\n", globalMaster.ackCount, globalMaster.addCount);
     return;
 }
+
+/* 
+print switch info
+*/
 void printInfoSwitch() {
     assert(forwardTable.size() > 0);
     printf("Forwarding table: \n");
@@ -501,6 +532,12 @@ void printInfoSwitch() {
     printf("Transmitted: HELLO: %d, ASK: %d, RELAYOUT: %d\n", 
     sArray[0].nHELLOtransm, sArray[0].nASKtrans, sArray[0].nRelayout); 
 }
+
+/* 
+Parse typed msg from keyboard (for switch)
+argument:
+    -keyboardInout: either "info" or "exit"
+*/
 void parseKeyboardSwitch(const char* keyboardInput) {
     if (strcmp(keyboardInput, "info") == 0) {
         assert(forwardTable.size() > 0);
@@ -512,6 +549,11 @@ void parseKeyboardSwitch(const char* keyboardInput) {
         exit(0);
     }
 }
+/* 
+Parse typed msg from keyboard (for master)
+argument:
+    -keyboardInout: either "info" or "exit"
+*/
 void parseKeyboardMaster(const char * keyboardInput) {
     // print stuff/
     if (strcmp(keyboardInput, "info") == 0) {
@@ -524,6 +566,13 @@ void parseKeyboardMaster(const char * keyboardInput) {
     } 
 }
 // --------------------------------------------------------------------------------
+/*
+poll fifo-0-i until i receives ack from master (for switch)
+argument:
+    - pollfds: pollfd array
+return:
+    -1 if ack received
+*/
 int getACK(pollfd * pollfds) {  // poll master until i get acknowledge
     FRAME frame;
     while (true) {
@@ -544,6 +593,14 @@ int getACK(pollfd * pollfds) {  // poll master until i get acknowledge
     return 0;
 }
 // ----------------------------------------------------------------------------------
+/* 
+parse and respond to incoming packages from switches to master(for master)
+Argument: 
+    -fd: fd of fifo-i-0
+    -frame: package received
+    -master: master struct
+    -sw: NULL pointer, unused
+*/
 void parseAndSendToSwitch(int fd, FRAME * frame, MASTERSWITCH * master, SWITCH * sw) {
     // parse Frame and send to fd // 
     MSG msg;
@@ -624,6 +681,15 @@ void parseAndSendToSwitch(int fd, FRAME * frame, MASTERSWITCH * master, SWITCH *
         break;
     }
 }
+
+/* 
+parse and respond to incoming packages from switch's perspective
+arguments: 
+    -currSwitchID: the 'i' in pswi
+    -frame: package received
+    -fds: 2d array of fds
+    -pSwitch: struc that represent pswi
+*/
 void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], SWITCH * pSwitch) {
     MSG msg;
     msg = frame->msg;
@@ -693,6 +759,18 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_
     }
 }
 // --------------------------------------------------------------------------------------
+/* 
+parse incoming header from port 3 of a switch
+Argument: 
+    -readbuff: a line from the file
+    -swichID: the 'i' of pswi
+    -fds: 2d array of fds
+    -pswtich: struct that represent pswi
+return:
+    -1 if we had to send ASK for this header
+    -2 if we applied rule to this header
+    -0 otherwise
+*/
 int parseFileLine(char* readbuff, int switchID, int fds[8][8], SWITCH*pswitch) {
     if (readbuff[0] == '#') {
         //printf("# so skipp\n");
@@ -780,6 +858,8 @@ int parseFileLine(char* readbuff, int switchID, int fds[8][8], SWITCH*pswitch) {
     }
     return 0;
 }
+
+
 // MASTER LOOP
 void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
     char readbuff[MAXWORD];
@@ -836,7 +916,8 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
         }
     }
 }
-// pSwitch loop
+
+// SWITCH loop
 void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const char* datafile) {
     // establish connection with master/pswj/pswk
     pollfd pollfds[SWITCHPORTS_N]; // = 5
