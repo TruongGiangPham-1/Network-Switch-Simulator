@@ -955,13 +955,13 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     fds[0][pSwitch->switchID] = openfifoRead(fifo_master_i);
     fds[pSwitch->switchID][0] = openfifoWrite(fifo_i_master);
     
-    //pollfd pollfds[SWITCHPORTS_N]; // = 5
-    //pollfds[0] = fifo-0-i/master to pswi; pollfds[1]=port1l pollfds[2]=port2, pollfds[4] = keyboard
+    //pollfds[0] = master to pswi
+    //pollfds[1]=port1,  pollfds[2]=port2, pollfds[4] = keyboard
     pollfds[0].fd = fds[0][pSwitch->switchID]; pollfds[0].events = POLLIN; 
     pollfds[3].fd = -1;
     pollfds[4].fd = STDIN_FILENO; pollfds[4].events = POLLIN; pollfds[4].revents = 0;
-    char readbuff[MAXLINE];
-    char keyboardbuff[MAXLINE];
+    char readbuff[MAXLINE];  // read from file
+    char keyboardbuff[MAXLINE];  // read from stdin
 
     //vector<fTABLEROW> forwardTable;
     fTABLEROW initialRule = {
@@ -976,6 +976,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     forwardTable.push_back(initialRule);
     FRAME frame;
     MSG msg;
+    // send HELLO
     msg = composeHELLOmsg(pSwitch->switchID, 0, pSwitch->lowIP, pSwitch->highIP, pSwitch->pswj, pSwitch->pswk);
     sendFrame(fds[pSwitch->switchID][0], HELLO, &msg);
     // print 
@@ -983,14 +984,12 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
     printHel.kind = HELLO;
     printHel.msg = msg;
     printFrame("Transmitted ", &printHel);
-    //
+    // get ACK from master first
     int ackowledge = getACK(pollfds);
     assert(ackowledge == 1); // assert its ackolowdged
     printf("\n");
-    //printf("hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
     (pSwitch->nHELLOtransm) += 1;
     (pSwitch->nACKreceived) += 1;
-    //printf("hello: %d, ack: %d\n", pSwitch->nHELLOtransm, pSwitch->nACKreceived);
     assert(pSwitch->nACKreceived > 0);
     assert(pSwitch->nHELLOtransm > 0);
     // open DATAFILE
@@ -1002,18 +1001,17 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
         perror("fopen FAILED: ");
     }
 
-    bool EOFreached = false;
-    bool ADDreceived = true;
+    bool EOFreached = false;  // EOF of file
+    bool ADDreceived = true;  // flag so that we only read more line from file if ADD is received.
     while (true) {
         memset(readbuff, 0, MAXLINE);
         if (ADDreceived and canRead) { // only read more line if ADD received
             
             if(fgets(readbuff, MAXLINE, (FILE*) fp) != NULL) {
                 if (readbuff[strlen(readbuff) - 1] == '\n') {
-                    readbuff[strlen(readbuff) - 1] = '\0';  // ???
+                    readbuff[strlen(readbuff) - 1] = '\0';  // clear \n char 
                 }
                 int ret = parseFileLine(readbuff, pSwitch->switchID, fds, pSwitch);
-                //printf("line 860, [%s]\n", readbuff);
                 if (ret == 1) {  // means that we sent ASK
                     ADDreceived = false;
                     pSwitch->nASKtrans += 1;
@@ -1024,32 +1022,31 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
                 ADDreceived = false; // so we dont read from file anymore
             }
         }
-        // todo; send HELLO and receive HELLO_ACK
+        // ** POLLING FROM MASTER, NEIGHBOR, AND KEYBOARD
         int pollret = poll(pollfds, SWITCHPORTS_N, 1);
         if (pollret < 0) {
-            if (errno == EINTR) {  // casued by SIGALARM to interupt poll
+            if (errno == EINTR) {  // casued by SIGALARM/SIGUSR1 to interupt poll
                 //cerr << "EINTR error while poll" << endl;
                 continue;
             }
             cerr << "pollret returned -1" << endl;
-            //fprintf(stderr, "%s\n", explain_poll(pollfds, SWITCHPORTS_N, 1));
             exit(EXIT_FAILURE);
         }
-        //printf("reached after poll\n");
-        // poll keyboard
+        // **POLL keyboard
         if (pollfds[4].revents and POLLIN) {
             memset(keyboardbuff, 0, MAXLINE);
             int bytesread = read(pollfds[4].fd, keyboardbuff, MAXLINE);
-            keyboardbuff[strlen(keyboardbuff) - 1] = '\0';
+            keyboardbuff[strlen(keyboardbuff) - 1] = '\0'; // clear \n
             assert(bytesread > 0);
             parseKeyboardSwitch(keyboardbuff);
         } 
-      
+        // POLL everything else 
         for (int i = 0; i < SWITCHPORTS_N - 2; i++) {  // check everything exept keyboard[0 - 3] and port 3
             if (pollfds[i].revents and POLLIN) {
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
-                if (pollfds[i].fd == -1) continue; //closed
-                printFrame("recieved ", &frame);  
+                // rcvFrame make pollfds[i].fd = -1 if that fd is closed by other side
+                if (pollfds[i].fd == -1) continue; 
+                printFrame("received ", &frame);  
                 if (frame.kind == ADD) ADDreceived = true;
                 parseSwitchMSG(pSwitch->switchID, &frame, fds, pSwitch);
             }
@@ -1058,7 +1055,7 @@ void do_switch(SWITCH * pSwitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1], const 
 }
 // ----------------------------------------------------------------------------------
 int main(int argc, char *argv[]) {
-    printf("PID=%d\n", getpid());
+    printf("PID=%d\n", getpid());  //pid of process incase you needed
     char tokens[10][MAXWORD];
     int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]; //fds[i][j] means fd for fifo-i-j
     
@@ -1074,7 +1071,6 @@ int main(int argc, char *argv[]) {
         perror("Unable to catch SIGUSR1");
         exit(1);
     }
-    // open fifo
 
     if (argc == 3 and strcmp(argv[1], "master") == 0) {
         // master switch
@@ -1083,13 +1079,10 @@ int main(int argc, char *argv[]) {
             strcpy(tokens[i - 1], argv[i]);
             // tokens[0] = "master"
             // tokens[1] = "nSwitch"
-            //do_master();
         }
-        //populateMaster(&master, tokens);
         populateMaster(&globalMaster, tokens);
         do_master(&globalMaster, fds);
     } else if (argc == 6) {  // SWTICH PERSPECTIVE
-        // pswi switch, TODO: error check argument
         isSwitch = true;
         for (int i = 1; i < 6; i++) {
             memset(tokens[i - 1], 0, MAXWORD); 
@@ -1100,16 +1093,14 @@ int main(int argc, char *argv[]) {
             // tokens[3] = "null/pswk"
             // tokens[4] = "IPlow-IPhigh"
         }
-        sArray.push_back(pSwitch);
-        //populateSwitch(&pSwitch, tokens);
+        // if we are switch switch array stores only struct for pswi
+        sArray.push_back(pSwitch); 
         populateSwitch(&sArray[0], tokens);
-        //do_switch(&pSwitch, fds, tokens[1]);
         do_switch(&sArray[0], fds, tokens[1]);
     } else {
         printf("invalid arguments\n");
         return 0;
     }
-    //printToken(tokens, argc - 1);  
     
     return 0;
 }
