@@ -862,9 +862,9 @@ int parseFileLine(char* readbuff, int switchID, int fds[8][8], SWITCH*pswitch) {
 
 // MASTER LOOP
 void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH + 1]) {
-    char readbuff[MAXWORD];
-    char writebuff[MAXWORD];
-    int nswitch_ = masterswitch -> numSwitch;
+    char readbuff[MAXWORD];  // UNUSED
+    char writebuff[MAXWORD];  // UNSED
+    int nswitch_ = masterswitch -> numSwitch;  // the number of switch
     pollfd pollfds[nswitch_ + 1];
     // SETUP KEYBOARD POLL
     pollfds[0].fd = STDIN_FILENO;
@@ -886,12 +886,9 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
     //vector<SWITCH> sArray;
     printf("established file descriptors, waiting for HELLO\n");
     while (true) {
-        //updateFDs();
-        //doMasterPolling();
         int pollret = poll(pollfds, nswitch_ + 1, 1); // 
-        //cout << "pollred " << pollret << endl;
         if (pollret < 0) {
-            if (errno == EINTR) {  // casued by SIGALARM to interupt poll
+            if (errno == EINTR) {  // casued by SIGALARM/SIGUSR1 to interupt poll
                 //cerr << "EINTR error while poll" << endl;
                 continue;
             }
@@ -904,12 +901,13 @@ void do_master(MASTERSWITCH * masterswitch, int fds[MAX_SWITCH + 1][MAX_SWITCH +
             readbuff[strlen(readbuff) - 1] = '\0';  // clear \n character
             parseKeyboardMaster(readbuff);
         }
+        // POLL everything else
         for (int i = 1; i < nswitch_ + 1; i++) {
             if (pollfds[i].revents and POLLIN) {
                 // something to read
                 frame = rcvFrame(pollfds[i].fd, pollfds, i);
                 if (pollfds[i].fd == -1) continue; // other end closed pipe so rcvFrame() changed fd to -1
-                printFrame("recieved ", &frame); 
+                printFrame("received ", &frame); 
                 parseAndSendToSwitch(fds[0][i], &frame, masterswitch, nullptr);
                 pollfds[i].revents = 0;
             }
