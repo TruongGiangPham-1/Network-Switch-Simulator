@@ -780,38 +780,35 @@ int parseFileLine(char* readbuff, int switchID, int fds[8][8], SWITCH*pswitch) {
         //printf("emptyline, skipping\n");
         return 0;
     }
+    // ----------------------------------------
+    // tokenize string like previous assignment
     vector<string>tokens;
     char readcopied[MAXLINE];
     char * token = NULL, *theRest = NULL;
     memset(readcopied, 0, MAXLINE);
     strcpy(readcopied, readbuff);
     char switchID_char = '0' + switchID;
-    //assert(switchID_char == '1');
-    //printf("swithcid char [%c]\n", switchID_char);
     theRest = readcopied;
     for (int i = 0; i < 3; i++) {
         token = strtok_r(theRest, " ", &theRest);
         string tok(token);
         tokens.push_back(tok);
     }
-    //printf("tokens[0][0] = [%c]\n", tokens[0][0]);
+    // ---------------------------------------------
     if (tokens[0][3] == switchID_char and tokens[1] != "delay") {  // process delay last
         pswitch->admit += 1;
         // we want this line
-        //printf("%s,%s,%s\n", tokens[0].c_str(), tokens[1].c_str(), tokens[2].c_str());
         //1. check the rule table 
         // 2. if dont exist, we send ASK. 
-        //if (tokens[0])
         assert(forwardTable.size() > 0);
         assert(forwardTable[0].actionVAL == 3);
-        //printf("forwardTable[0].ACtionTYPE=%d\n", forwardTable[0].ACTIONTYPE);
         assert(forwardTable[0].ACTIONTYPE == FORWARD);
         int srcIP = stoi(tokens[1]);
         int destIP = stoi(tokens[2]);
         for (int i = 0; i < forwardTable.size(); i++) {
             // assumes that lowip is within range
             if (forwardTable[i].destIP_lo <= destIP and destIP <= forwardTable[i].destIP_hi) {
-                //printf("ine 669\n");
+                // **if header matches 
                 forwardTable[i].pktCount += 1;
                 if (forwardTable[i].ACTIONTYPE == FORWARD and forwardTable[i].actionVAL != 3) {
                     // case: if we have to relay this packet to diff switch
@@ -835,9 +832,7 @@ int parseFileLine(char* readbuff, int switchID, int fds[8][8], SWITCH*pswitch) {
             } 
         }
         // send ask
-        //printf("ASK send\n");
         MSG msg;
-        //printf("token1 [%s], token2[%s]\n", tokens[1].c_str(), tokens[2].c_str());
         msg = composeASKmsg(srcIP, destIP, switchID);
         sendFrame(fds[switchID][0], ASK, &msg);
         FRAME printASK;
@@ -847,11 +842,12 @@ int parseFileLine(char* readbuff, int switchID, int fds[8][8], SWITCH*pswitch) {
         return 1; 
         
     }
+    // case: delay header, we setup setitimer to setup alarm to trigger SIGALRM
     if (tokens[0][3] == switchID_char and tokens[1] == "delay") {
         // handle delay packet
         int delay = stoi(tokens[2]);
         callTimer(delay);
-        canRead = false;
+        canRead = false;  // dont read from file during delay
         printf("\n");
         printf("**Entering a delay period of %d msec\n", delay);
         printf("\n");
