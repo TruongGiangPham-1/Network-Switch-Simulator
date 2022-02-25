@@ -701,7 +701,7 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_
             // add to forwarding table
             printf("\n");
             (pSwitch->nADDreceived) += 1;
-            fTABLEROW rule = {
+            fTABLEROW rule = {  // add rule from ADD to forward table
                 /* scrIP_lo*/ 0,
                 /* scrIP_hi */1000,
                 /* destIP_lo*/ msg.pAdd.destIP_lo,
@@ -722,18 +722,11 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_
                     assert(fds[currSwitchID][currSwitchID + 1] > 0);
                     sendmsg = composeRELAYmsg(frame, currSwitchID);
                     sendFrame(fds[currSwitchID][currSwitchID + 1], RELAY, &sendmsg);
-                    //FRAME relayF;
-                    //relayF.msg = sendmsg;
-                    //relayF.kind = RELAY;
-                    //printFrame("Transmitted ", &relayF);
+  
                 } else if (rule.actionVAL == 1) {
                     assert(fds[currSwitchID][currSwitchID - 1] > 0);
                     sendmsg = composeRELAYmsg(frame, currSwitchID);
                     sendFrame(fds[currSwitchID][currSwitchID - 1], RELAY, &sendmsg);
-                    //FRAME relayF;
-                    //relayF.msg = sendmsg;
-                    //relayF.kind = RELAY;
-                    //printFrame("Transmitted ", &relayF);
                 }
                 forwardTable[forwardTable.size() - 1].pktCount += 1;
                 pSwitch->nRelayout += 1;
@@ -750,7 +743,7 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_
             //        return;
             //    }
             //} 
-        } // else we relay to whichever port of this switch TODO
+        } // else we relay to whichever port of this switch TODO (INCOMPLETE)
         (pSwitch->nRELAYIN) += 1;
         break;
     } 
