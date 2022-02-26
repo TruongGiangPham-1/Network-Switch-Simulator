@@ -17,6 +17,9 @@
 a2w22:
 	g++ a2w22.cpp -o a2w22
 
+allfifo: # make all fifos for 7 switches
+	mkfifo -m 666 fifo-1-0 fifo-0-1 fifo-2-0 fifo-0-2 fifo-3-0 fifo-0-3 fifo-4-0 fifo-0-4 fifo-5-0 fifo-0-5 fifo-6-0 fifo-0-6 fifo-7-0 fifo-0-7
+	mkfifo -m 666 fifo-1-2 fifo-2-1 fifo-2-3 fifo-3-2 fifo-3-4 fifo-4-3 fifo-4-5 fifo-5-4 fifo-5-6 fifo-6-5 fifo-6-7 fifo-7-6
 onefifo: 
 	mkfifo fifo-0-1 fifo-1-0
 twofifo:
@@ -33,9 +36,12 @@ ex2s2:
 ex1s1:
 	./a2w22 psw1 ex1.dat null null 100-110
 
+tar:
+	tar -cvf submit.tar Makefile a2w22.cpp report.pdf 
+
 cleanfifo: # remove all fifos in the current directory
 	find . -type p -delete 
 clean:
-	rm -rf a2w22
+	rm -rf a2w22 submit.tar
 
 
