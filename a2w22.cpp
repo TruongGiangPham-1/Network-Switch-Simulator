@@ -1052,6 +1052,10 @@ int main(int argc, char *argv[]) {
 
     if (argc == 3 and strcmp(argv[1], "master") == 0) {
         // master switch
+        if (stoi(argv[2]) > MAX_SWITCH) {
+            printf("too many switches, max is 7\n");
+            exit(1);
+        }
         isMaster = true;
         for (int i = 1; i < 3; i++) {
             strcpy(tokens[i - 1], argv[i]);
