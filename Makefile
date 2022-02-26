@@ -1,5 +1,21 @@
+# ------------------------------------------------------------
+# Makefile-cc: Makefile for CMPUT 379 A2
+#
+# Usage: make        // compile a2w22.cpp
+#        make a2w22 // compile a2w22.cpp
+#        make onefifo  // create fifos for ex1.dat
+#        make twofifo  // create fifos for ex2.dat and ex3.dat
+#        make ex3s1    // runs psw1 switch for ex3.dat
+#        make ex3s2    // runs psw2 switch for ex3.dat
+#        make ex2s1    // runs psw1 switch for ex2.dat
+#        make ex2s2    // runs psw2 switch for ex2.dat
+#        make tar    // produce submit.tar
+#        make cleanfifo // remove all fifo
+#        make clean  // remove submit.tar and msh379 executable
+# ------------------------------------------------------------
 
-
+a2w22:
+	g++ a2w22.cpp -o a2w22
 
 onefifo: 
 	mkfifo fifo-0-1 fifo-1-0
@@ -17,8 +33,9 @@ ex2s2:
 ex1s1:
 	./a2w22 psw1 ex1.dat null null 100-110
 
-clean: # remove all fifos in the current directory
+cleanfifo: # remove all fifos in the current directory
 	find . -type p -delete 
-
+clean:
+	rm -rf a2w22
 
 

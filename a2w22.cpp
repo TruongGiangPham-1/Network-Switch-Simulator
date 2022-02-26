@@ -45,6 +45,10 @@ using namespace std;
 int canRead = true; // flag for delay, if !canRead, we dont read from file
 
 typedef pair<int, int> PII; // PII = pair int int
+/* 
+KIND and the usage of UNION is a modified code from the lab3
+to fit this assignment
+*/
 typedef enum { HELLO, HELLO_ACK, ASK, ADD, RELAY } KIND;	  // Packet kinds
 char KINDNAME[][MAXWORD]= { "HELLO", "HELLO_ACK", "ASK", "ADD", "RELAY" };
 typedef enum {FORWARD, DROP} tableACTION;    // forward table action
@@ -465,6 +469,8 @@ argument:
     -name: fifoname
 return:
     -fd
+This source solve my problem for nonblock read.
+//https://stackoverflow.com/questions/580013/how-do-i-perform-a-non-blocking-fopen-on-a-named-pipe-mkfifo
 */
 
 int openfifoWrite(string name) {
