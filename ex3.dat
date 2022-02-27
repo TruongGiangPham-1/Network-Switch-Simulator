@@ -3,7 +3,7 @@
 # a2w22 psw1 ex3.dat null psw2 100-110
 # a2w22 psw2 ex3.dat psw1 null 200-210
 psw1 100 102
-psw1 delay 7000
+psw1 delay 5000
 psw1 100 200
 psw1 100 300
 psw2 200 300
@@ -11,4 +11,4 @@ psw3 200 300
 psw2 200 100
 psw2 200 100
 psw1 100 103
-psw1 100 300
+psw1 100 104

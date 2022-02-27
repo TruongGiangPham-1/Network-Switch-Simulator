@@ -768,12 +768,29 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_
         }
         // we cannot any rule to this relayed package. that means rule doesnt exist for this pswitch so i need to relay to neigbor
 
-        if (msg.pRelay.srcIP < pSwitch->switchID) {  // casE: we received this relay from psw(i - 1)
-            // relat to psw(i + 1), port 2
-            
+        if (msg.pRelay.switchID < pSwitch->switchID) {  // casE: we received this relay from psw(i - 1)
+            // relay to psw(i + 1), port 2
+            pSwitch->nRelayout +=1 ;
+            MSG addmsg;
+            MSG relaymsg;
+            addmsg = composeADDmsg(0, 0, FORWARD, 2, (pSwitch->switchID) + 1, pSwitch->switchID, msg.pRelay.srcIP, msg.pRelay.destIP);
+            FRAME f1;
+            f1.msg = addmsg;
+            f1.kind = ADD;
+            relaymsg = composeRELAYmsg(&f1, pSwitch->switchID); 
+            sendFrame(fds[pSwitch->switchID][(pSwitch->switchID) + 1], RELAY, &relaymsg);
 
-        } else if (msg.pRelay.srcIP > pSwitch->switchID) {  // we recieved it from psw(i + 1)
+        } else if (msg.pRelay.switchID > pSwitch->switchID) {  // we recieved it from psw(i + 1)
             // relay to psw(i - 1), port1
+            pSwitch->nRelayout +=1 ;
+            MSG addmsg;
+            MSG relaymsg;
+            addmsg = composeADDmsg(0, 0, FORWARD, 1, (pSwitch->switchID) - 1, pSwitch->switchID, msg.pRelay.srcIP, msg.pRelay.destIP);
+            FRAME f1;
+            f1.msg = addmsg;
+            f1.kind = ADD;
+            relaymsg = composeRELAYmsg(&f1, pSwitch->switchID); 
+            sendFrame(fds[pSwitch->switchID][(pSwitch->switchID)  - 1], RELAY, &relaymsg);
         }
         break;
     } 
