@@ -762,10 +762,19 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_
                         sendFrame(fds[pSwitch->switchID][(pSwitch->switchID) + 1], RELAY, &relaymsg);
                     }
                 }
+                
                 return;
             }
         }
-        // we cannot apply
+        // we cannot any rule to this relayed package. that means rule doesnt exist for this pswitch so i need to relay to neigbor
+
+        if (msg.pRelay.srcIP < pSwitch->switchID) {  // casE: we received this relay from psw(i - 1)
+            // relat to psw(i + 1), port 2
+            
+
+        } else if (msg.pRelay.srcIP > pSwitch->switchID) {  // we recieved it from psw(i + 1)
+            // relay to psw(i - 1), port1
+        }
         break;
     } 
     default:
