@@ -726,6 +726,8 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_
         }
     case RELAY:
     {
+
+        (pSwitch->nRELAYIN) += 1;
         if (msg.pRelay.destSwitchID == currSwitchID) {
             // this is the switch that we can add rule to.
             //for (int i = 0; i < forwardTable.size(); i++) {
@@ -734,8 +736,36 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_
             //        return;
             //    }
             //} 
+            
         } // else we relay to whichever port of this switch TODO (INCOMPLETE)
-        (pSwitch->nRELAYIN) += 1;
+        for (int i = 0; i < forwardTable.size(); i++) {
+            if (msg.pRelay.destIP >= forwardTable[i].destIP_lo and msg.pRelay.destIP <= forwardTable[i].destIP_hi) {
+                forwardTable[i].pktCount += 1;
+                if (forwardTable[i].ACTIONTYPE == FORWARD and forwardTable[i].actionVAL != 3) {
+                    // we have to relay again
+                    pSwitch->nRelayout += 1;
+                    // send relay
+                    MSG addmsg;
+                    MSG relaymsg;
+                    int relaydestID = (pSwitch->switchID) + 1; // assume we relay to psw(i + 1);
+                    if (forwardTable[i].actionVAL == 1) {
+                        relaydestID = (pSwitch->switchID) - 1; // relay to psw(i - 1);
+                    } 
+                    addmsg = composeADDmsg(0, 0, FORWARD, forwardTable[i].actionVAL, relaydestID, pSwitch->switchID, msg.pRelay.srcIP, msg.pRelay.destIP);
+                    FRAME f1;
+                    f1.msg = addmsg;
+                    f1.kind = ADD;
+                    relaymsg = composeRELAYmsg(&f1, pSwitch->switchID);
+                    if (forwardTable[i].actionVAL == 1) {  // relay to port 1
+                        sendFrame(fds[pSwitch->switchID][(pSwitch->switchID) - 1], RELAY, &relaymsg);
+                    } else if (forwardTable[i].actionVAL == 2) {
+                        sendFrame(fds[pSwitch->switchID][(pSwitch->switchID) + 1], RELAY, &relaymsg);
+                    }
+                }
+                return;
+            }
+        }
+        // we cannot apply
         break;
     } 
     default:
@@ -800,7 +830,11 @@ int parseFileLine(char* readbuff, int switchID, int fds[8][8], SWITCH*pswitch) {
                     // send relay?
                     MSG addmsg;
                     MSG relaymsg;
-                    addmsg = composeADDmsg(srcIP, destIP, FORWARD, forwardTable[i].actionVAL, forwardTable[i].actionVAL, switchID, srcIP, destIP);
+                    int relayDestID = switchID + 1;  // assume relay to psw(i + 1);
+                    if (forwardTable[i].actionVAL == 1) {
+                        relayDestID = switchID - 1; // relay to psw(i - 1);
+                    }
+                    addmsg = composeADDmsg(srcIP, destIP, FORWARD, forwardTable[i].actionVAL, relayDestID, switchID, srcIP, destIP);
                     FRAME f1;
                     f1.msg = addmsg;
                     f1.kind = ADD;

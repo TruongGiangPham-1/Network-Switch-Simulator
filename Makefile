@@ -37,7 +37,7 @@ ex1s1:
 	./a2w22 psw1 ex1.dat null null 100-110
 
 tar:
-	tar -cvf submit.tar Makefile a2w22.cpp report.pdf 
+	tar -cvf submit.tar Makefile a2w22.cpp report.pdf ex1.dat ex2.dat ex3.dat
 
 cleanfifo: # remove all fifos in the current directory
 	find . -type p -delete 
