@@ -127,9 +127,9 @@ typedef struct {
 
 typedef struct {
     int switchID;  // source switch id
-    int destSwitchID; // assert(destSwithID == switchID of switch relayed to)
-    int srcIP;  // not needed, but for error check
-    int destIP;  // notneeded, but for error check
+    int destSwitchID; // switchID its relaying to  
+    int srcIP;  // 
+    int destIP;  // 
 } RELAY_PACK;
 
 
@@ -278,8 +278,7 @@ FRAME rcvFrame (int fd, struct pollfd* pollfds, int index)
     memset( (char *) &frame, 0, sizeof(frame) );
     len= read (fd, (char *) &frame, sizeof(frame));
     if (len != sizeof(frame))
-        WARNING ("Received frame has length= %d (expected= %d)\n",
-		  len, sizeof(frame));
+        //WARNING ("Received frame has length= %d (expected= %d)\n",len, sizeof(frame));
     if (len == 0) {  // ** MY EDIT
         pollfds[index].fd = -1; // means that othe end have closed pipe 
     }
@@ -728,16 +727,6 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_
     {
 
         (pSwitch->nRELAYIN) += 1;
-        if (msg.pRelay.destSwitchID == currSwitchID) {
-            // this is the switch that we can add rule to.
-            //for (int i = 0; i < forwardTable.size(); i++) {
-            //    if (msg.pRelay.destIP >= forwardTable[i].destIP_lo and msg.pRelay.destIP <= forwardTable[i].destIP_hi) {
-            //        forwardTable[i].pktCount += 1;
-            //        return;
-            //    }
-            //} 
-            
-        } // else we relay to whichever port of this switch TODO (INCOMPLETE)
         for (int i = 0; i < forwardTable.size(); i++) {
             if (msg.pRelay.destIP >= forwardTable[i].destIP_lo and msg.pRelay.destIP <= forwardTable[i].destIP_hi) {
                 forwardTable[i].pktCount += 1;
@@ -766,7 +755,7 @@ void parseSwitchMSG(int currSwitchID, FRAME * frame,int fds[MAX_SWITCH + 1][MAX_
                 return;
             }
         }
-        // we cannot any rule to this relayed package. that means rule doesnt exist for this pswitch so i need to relay to neigbor
+        // here, we coudn't any rule to this relayed package. that means rule doesnt exist for this pswitch so i need to relay to neigbor
 
         if (msg.pRelay.switchID < pSwitch->switchID) {  // casE: we received this relay from psw(i - 1)
             // relay to psw(i + 1), port 2
