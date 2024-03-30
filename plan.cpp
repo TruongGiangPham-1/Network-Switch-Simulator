@@ -1,3 +1,4 @@
+// planinng the system
 struct Packet {
     int senderID; // if psw1 send it, senderID == 1
     char msg[50];
